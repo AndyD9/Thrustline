@@ -13,7 +13,46 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
-    "airports:fetch": "node scripts/fetch-airports.mjs"
+    "airports:fetch": "node scripts/fetch-airports.mjs",
+    "build:electron": "tsc && vite build",
+    "build:win": "npm run build:electron && electron-builder --win",
+    "build:mac": "npm run build:electron && electron-builder --mac",
+    "build:linux": "npm run build:electron && electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.thrustline.app",
+    "productName": "Thrustline",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "electron/preload.cjs",
+      "node_modules/**/*",
+      "prisma/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "prisma",
+        "to": "prisma"
+      },
+      {
+        "from": "src/data",
+        "to": "data"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false
+    },
+    "mac": {
+      "target": "dmg"
+    }
   },
   "keywords": [],
   "author": "",
