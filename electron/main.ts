@@ -563,15 +563,46 @@ async function main() {
 
   // ── Cleanup ───────────────────────────────────────────────────────────────
 
-  mainWindow.on('closed', () => { mainWindow = null })
-
-  app.on('before-quit', async () => {
+  function cleanup() {
     clearInterval(leaseInterval)
     clearInterval(eventInterval)
     syncEngine?.stop()
-    await syncEngine?.pushNow().catch(() => {})
     simBridge.stop()
-    await fastify.close()
+  }
+
+  mainWindow.on('closed', () => { mainWindow = null })
+
+  app.on('before-quit', async (e) => {
+    e.preventDefault()
+    cleanup()
+    try { await syncEngine?.pushNow() } catch {}
+    try { await fastify.close() } catch {}
+    process.exit(0)
+  })
+
+  // Force-kill the process on crash or unhandled errors so nothing lingers
+  process.on('uncaughtException', (err) => {
+    console.error('[Thrustline] Uncaught exception:', err)
+    cleanup()
+    process.exit(1)
+  })
+
+  process.on('unhandledRejection', (err) => {
+    console.error('[Thrustline] Unhandled rejection:', err)
+    cleanup()
+    process.exit(1)
+  })
+
+  app.on('render-process-gone', (_event, _webContents, details) => {
+    console.error('[Thrustline] Render process gone:', details.reason)
+    cleanup()
+    process.exit(1)
+  })
+
+  app.on('child-process-gone', (_event, details) => {
+    console.error('[Thrustline] Child process gone:', details.type, details.reason)
+    cleanup()
+    process.exit(1)
   })
 }
 
