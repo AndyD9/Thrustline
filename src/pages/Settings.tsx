@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useSim } from '../contexts/SimContext'
+import { useAuth } from '../contexts/AuthContext'
+import { useSync } from '../contexts/SyncContext'
 import { useCompany } from '../hooks/useCompany'
 import { api } from '../lib/api'
 
 export function Settings() {
   const { flightCount } = useSim()
   const { company, loading } = useCompany(flightCount)
+  const { user, signOut } = useAuth()
+  const { status: syncStatus, syncNow } = useSync()
 
   const [name,             setName]             = useState('')
   const [hubIcao,          setHubIcao]          = useState('')
@@ -78,6 +82,39 @@ export function Settings() {
           {flash.text}
         </div>
       )}
+
+      {/* Account */}
+      <div className="rounded-lg border border-gray-800 bg-gray-900 p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-gray-300">Account</h2>
+        <div className="text-xs text-gray-500 space-y-2">
+          <p>Email: <span className="text-gray-300">{user?.email ?? '—'}</span></p>
+          <p>
+            Sync status:{' '}
+            <span className={
+              syncStatus === 'idle' ? 'text-emerald-400'
+                : syncStatus === 'syncing' ? 'text-yellow-400'
+                : syncStatus === 'error' ? 'text-red-400'
+                : 'text-gray-500'
+            }>
+              {syncStatus}
+            </span>
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={syncNow}
+            className="px-3 py-1.5 rounded text-xs font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+          >
+            Sync now
+          </button>
+          <button
+            onClick={signOut}
+            className="px-3 py-1.5 rounded text-xs font-medium bg-gray-700 text-red-400 hover:bg-gray-600 transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
 
       {/* Company settings */}
       <form onSubmit={handleSave} className="rounded-lg border border-gray-800 bg-gray-900 p-5 space-y-4">

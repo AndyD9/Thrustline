@@ -69,10 +69,14 @@ export interface RecordCashflowParams {
   landingFee:  number
   revenue:     number
   netResult:   number
+  userId:      string
 }
 
 export async function recordCashflow(params: RecordCashflowParams): Promise<void> {
-  const { prisma, companyId, flightId, fuelCost, landingFee, revenue, netResult } = params
+  const { prisma, companyId, flightId, fuelCost, landingFee, revenue, netResult, userId } = params
+
+  // Verify the company belongs to this user
+  await prisma.company.findFirstOrThrow({ where: { id: companyId, userId } })
 
   await prisma.$transaction([
     // Transaction revenus

@@ -100,11 +100,12 @@ export const CreateDispatchSchema = z.object({
 
 export async function createDispatch(
   prisma: PrismaClient,
+  userId: string,
   input: z.infer<typeof CreateDispatchSchema>,
 ) {
   const { originIcao, destIcao, distanceNm, aircraftId } = input
 
-  const company = await prisma.company.findFirstOrThrow()
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
 
   // Resolve aircraft: explicit → active → first in fleet
   const aircraft = aircraftId
@@ -166,8 +167,10 @@ export async function createDispatch(
   })
 }
 
-export async function getDispatches(prisma: PrismaClient) {
+export async function getDispatches(prisma: PrismaClient, userId: string) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   return prisma.dispatch.findMany({
+    where: { companyId: company.id },
     orderBy: { createdAt: 'desc' },
     take: 50,
   })

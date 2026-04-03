@@ -8,9 +8,11 @@ export const CreateRouteSchema = z.object({
 
 // ── Discovered routes (aggregated from flight history) ────────────────────
 
-export async function getDiscoveredRoutes(prisma: PrismaClient) {
+export async function getDiscoveredRoutes(prisma: PrismaClient, userId: string) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   const rows = await prisma.flight.groupBy({
     by: ['departureIcao', 'arrivalIcao'],
+    where: { companyId: company.id },
     _count:  { id: true },
     _sum:    { revenue: true, netResult: true, fuelCost: true, landingFee: true, distanceNm: true },
     _avg:    { landingVsFpm: true, distanceNm: true, netResult: true },
@@ -33,18 +35,20 @@ export async function getDiscoveredRoutes(prisma: PrismaClient) {
 
 // ── Saved routes (user-bookmarked) ────────────────────────────────────────
 
-export async function getSavedRoutes(prisma: PrismaClient) {
+export async function getSavedRoutes(prisma: PrismaClient, userId: string) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   return prisma.route.findMany({
-    where:   { active: true },
+    where:   { active: true, companyId: company.id },
     orderBy: { originIcao: 'asc' },
   })
 }
 
 export async function createRoute(
   prisma: PrismaClient,
+  userId: string,
   data: z.infer<typeof CreateRouteSchema>,
 ) {
-  const company = await prisma.company.findFirstOrThrow()
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
 
   // Avoid duplicate saved routes
   const existing = await prisma.route.findFirst({

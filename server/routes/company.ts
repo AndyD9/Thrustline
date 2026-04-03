@@ -33,19 +33,19 @@ const MaintainParams = z.object({ id: z.string().min(1) })
 export async function companyRoutes(fastify: FastifyInstance) {
   // ── Reads ──────────────────────────────────────────────────────────────
 
-  fastify.get('/api/company', async (_request, _reply) => {
-    const company = await getCompany(fastify.prisma)
+  fastify.get('/api/company', async (request, _reply) => {
+    const company = await getCompany(fastify.prisma, request.userId)
     if (!company) return { onboarded: false }
     return company
   })
 
-  fastify.get('/api/fleet', async () => {
-    return getFleet(fastify.prisma)
+  fastify.get('/api/fleet', async (request) => {
+    return getFleet(fastify.prisma, request.userId)
   })
 
   fastify.get('/api/transactions', async (request) => {
     const { limit } = request.query as { limit?: string }
-    return getTransactions(fastify.prisma, limit ? parseInt(limit, 10) : undefined)
+    return getTransactions(fastify.prisma, request.userId, limit ? parseInt(limit, 10) : undefined)
   })
 
   // Return the static catalog so the UI can display lease options
@@ -80,7 +80,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
     const parsed = SetupBody.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() })
     try {
-      const company = await setupCompany(fastify.prisma, parsed.data)
+      const company = await setupCompany(fastify.prisma, request.userId, parsed.data)
       return reply.status(201).send(company)
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
@@ -88,8 +88,8 @@ export async function companyRoutes(fastify: FastifyInstance) {
   })
 
   // GET /api/company/loan — current loan state (null if no company or no loan)
-  fastify.get('/api/company/loan', async () => {
-    return await getActiveLoan(fastify.prisma) ?? null
+  fastify.get('/api/company/loan', async (request) => {
+    return await getActiveLoan(fastify.prisma, request.userId) ?? null
   })
 
   // ── Actions ────────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: parsed.error.flatten() })
     }
     try {
-      const aircraft = await leaseAircraft(fastify.prisma, parsed.data.icaoType)
+      const aircraft = await leaseAircraft(fastify.prisma, request.userId, parsed.data.icaoType)
       return reply.status(201).send(aircraft)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -116,7 +116,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: 'Invalid aircraft id' })
     }
     try {
-      const result = await maintainAircraft(fastify.prisma, parsed.data.id)
+      const result = await maintainAircraft(fastify.prisma, request.userId, parsed.data.id)
       return result
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -129,7 +129,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
     const parsed = UpdateCompanyBody.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() })
     try {
-      return await updateCompany(fastify.prisma, parsed.data)
+      return await updateCompany(fastify.prisma, request.userId, parsed.data)
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
     }
@@ -139,7 +139,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
   fastify.patch('/api/fleet/:id/activate', async (request, reply) => {
     const { id } = request.params as { id: string }
     try {
-      await setActiveAircraft(fastify.prisma, id)
+      await setActiveAircraft(fastify.prisma, request.userId, id)
       return reply.status(204).send()
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
@@ -147,9 +147,9 @@ export async function companyRoutes(fastify: FastifyInstance) {
   })
 
   // POST /api/company/reset  → wipe flights/transactions/routes, reset capital
-  fastify.post('/api/company/reset', async (_request, reply) => {
+  fastify.post('/api/company/reset', async (request, reply) => {
     try {
-      await resetCompanyData(fastify.prisma)
+      await resetCompanyData(fastify.prisma, request.userId)
       return reply.status(204).send()
     } catch (err: unknown) {
       return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) })
@@ -171,7 +171,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
     const parsed = LeaseBody.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() })
     try {
-      const aircraft = await purchaseAircraft(fastify.prisma, parsed.data.icaoType)
+      const aircraft = await purchaseAircraft(fastify.prisma, request.userId, parsed.data.icaoType)
       return reply.status(201).send(aircraft)
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
@@ -182,7 +182,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
   fastify.post('/api/fleet/:id/sell', async (request, reply) => {
     const { id } = request.params as { id: string }
     try {
-      const result = await sellAircraft(fastify.prisma, id)
+      const result = await sellAircraft(fastify.prisma, request.userId, id)
       return result
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
@@ -203,17 +203,17 @@ export async function companyRoutes(fastify: FastifyInstance) {
   // ── Reputation ──────────────────────────────────────────────────────────
 
   // GET /api/reputation — all route reputations
-  fastify.get('/api/reputation', async (_request, reply) => {
-    const company = await getCompany(fastify.prisma)
+  fastify.get('/api/reputation', async (request, reply) => {
+    const company = await getCompany(fastify.prisma, request.userId)
     if (!company) return reply.status(404).send({ error: 'No company found' })
-    return getAllReputations(fastify.prisma, company.id)
+    return getAllReputations(fastify.prisma, request.userId, company.id)
   })
 
   // GET /api/reputation/score — company-wide average reputation
-  fastify.get('/api/reputation/score', async (_request, reply) => {
-    const company = await getCompany(fastify.prisma)
+  fastify.get('/api/reputation/score', async (request, reply) => {
+    const company = await getCompany(fastify.prisma, request.userId)
     if (!company) return reply.status(404).send({ error: 'No company found' })
-    const score = await getCompanyReputation(fastify.prisma, company.id)
+    const score = await getCompanyReputation(fastify.prisma, request.userId, company.id)
     return { score }
   })
 }

@@ -49,8 +49,9 @@ export const CATALOG_BY_TYPE = new Map(AIRCRAFT_CATALOG.map((a) => [a.icaoType, 
 
 // ── Reads ─────────────────────────────────────────────────────────────────
 
-export async function getCompany(prisma: PrismaClient) {
+export async function getCompany(prisma: PrismaClient, userId: string) {
   return prisma.company.findFirst({
+    where: { userId },
     include: {
       fleet: true,
       _count: { select: { flights: true } },
@@ -58,15 +59,19 @@ export async function getCompany(prisma: PrismaClient) {
   })
 }
 
-export async function getFleet(prisma: PrismaClient) {
+export async function getFleet(prisma: PrismaClient, userId: string) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   return prisma.aircraft.findMany({
+    where: { companyId: company.id },
     orderBy: { name: 'asc' },
     include: { _count: { select: { flights: true } } },
   })
 }
 
-export async function getTransactions(prisma: PrismaClient, limit = 50) {
+export async function getTransactions(prisma: PrismaClient, userId: string, limit = 50) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   return prisma.transaction.findMany({
+    where: { companyId: company.id },
     orderBy: { createdAt: 'desc' },
     take: limit,
   })
@@ -81,9 +86,10 @@ export function maintenanceCost(currentHealthPct: number): number {
 export async function maintainAircraft(
   prisma: PrismaClient,
   aircraftId: string,
+  userId: string,
 ) {
   const aircraft = await prisma.aircraft.findUniqueOrThrow({ where: { id: aircraftId } })
-  const company  = await prisma.company.findFirstOrThrow()
+  const company  = await prisma.company.findFirstOrThrow({ where: { userId } })
   const cost     = maintenanceCost(aircraft.healthPct)
 
   if (company.capital < cost) {
@@ -117,8 +123,9 @@ export async function maintainAircraft(
 export async function leaseAircraft(
   prisma: PrismaClient,
   icaoType: string,
+  userId: string,
 ) {
-  const company = await prisma.company.findFirstOrThrow()
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   const catalog = AIRCRAFT_CATALOG.find((a) => a.icaoType === icaoType)
   if (!catalog) throw new Error(`Unknown aircraft type: ${icaoType}`)
 
@@ -159,8 +166,9 @@ const DEPRECIATION_RATE = 0.70  // resale = purchasePrice × health% × 0.70
 export async function purchaseAircraft(
   prisma: PrismaClient,
   icaoType: string,
+  userId: string,
 ) {
-  const company = await prisma.company.findFirstOrThrow()
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   const catalog = AIRCRAFT_CATALOG.find((a) => a.icaoType === icaoType)
   if (!catalog) throw new Error(`Unknown aircraft type: ${icaoType}`)
 
@@ -204,6 +212,7 @@ export function resaleValue(purchasePrice: number, healthPct: number): number {
 export async function sellAircraft(
   prisma: PrismaClient,
   aircraftId: string,
+  userId: string,
 ) {
   const aircraft = await prisma.aircraft.findUniqueOrThrow({ where: { id: aircraftId } })
   if (aircraft.ownership !== 'owned') {
@@ -213,7 +222,7 @@ export async function sellAircraft(
     throw new Error('Aircraft has no purchase price on record.')
   }
 
-  const company = await prisma.company.findFirstOrThrow()
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   const salePrice = resaleValue(aircraft.purchasePrice, aircraft.healthPct)
 
   // If this aircraft is active, unset it
@@ -250,14 +259,15 @@ export async function sellAircraft(
 
 export async function updateCompany(
   prisma: PrismaClient,
+  userId: string,
   data: { name?: string; hubIcao?: string; airlineCode?: string; simbriefUsername?: string },
 ) {
-  const company = await prisma.company.findFirstOrThrow()
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   return prisma.company.update({ where: { id: company.id }, data })
 }
 
-export async function setActiveAircraft(prisma: PrismaClient, aircraftId: string) {
-  const company = await prisma.company.findFirstOrThrow()
+export async function setActiveAircraft(prisma: PrismaClient, userId: string, aircraftId: string) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   // Verify the aircraft belongs to this company
   await prisma.aircraft.findFirstOrThrow({ where: { id: aircraftId, companyId: company.id } })
   return prisma.company.update({
@@ -266,8 +276,8 @@ export async function setActiveAircraft(prisma: PrismaClient, aircraftId: string
   })
 }
 
-export async function resetCompanyData(prisma: PrismaClient) {
-  const company = await prisma.company.findFirstOrThrow()
+export async function resetCompanyData(prisma: PrismaClient, userId: string) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   await prisma.$transaction([
     prisma.flight.deleteMany({ where: { companyId: company.id } }),
     prisma.transaction.deleteMany({ where: { companyId: company.id } }),
@@ -281,8 +291,8 @@ export async function resetCompanyData(prisma: PrismaClient) {
 
 // ── Monthly lease deduction (called by Electron on interval) ─────────────
 
-export async function deductMonthlyLeases(prisma: PrismaClient) {
-  const company = await prisma.company.findFirstOrThrow({ include: { fleet: true } })
+export async function deductMonthlyLeases(prisma: PrismaClient, userId: string) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId }, include: { fleet: true } })
   const leased  = company.fleet.filter((a) => a.ownership === 'leased')
   if (leased.length === 0) return
 
@@ -334,9 +344,9 @@ export interface SetupCompanyInput {
   simbriefUsername?:  string
 }
 
-export async function setupCompany(prisma: PrismaClient, input: SetupCompanyInput) {
+export async function setupCompany(prisma: PrismaClient, userId: string, input: SetupCompanyInput) {
   // Prevent double setup
-  const existing = await prisma.company.findFirst()
+  const existing = await prisma.company.findFirst({ where: { userId } })
   if (existing?.onboarded) throw new Error('Company already set up.')
 
   const loan = LOAN_OPTIONS.find((l) => l.key === input.loanOption)
@@ -370,6 +380,7 @@ export async function setupCompany(prisma: PrismaClient, input: SetupCompanyInpu
       capital,
       onboarded:       true,
       simbriefUsername: input.simbriefUsername?.trim() || null,
+      userId,
     },
   })
 
@@ -427,14 +438,15 @@ export async function setupCompany(prisma: PrismaClient, input: SetupCompanyInpu
   }
 
   return prisma.company.findFirstOrThrow({
+    where: { userId },
     include: { fleet: true, _count: { select: { flights: true } } },
   })
 }
 
 // ── Loan management ──────────────────────────────────────────────────────
 
-export async function getActiveLoan(prisma: PrismaClient) {
-  const company = await prisma.company.findFirst()
+export async function getActiveLoan(prisma: PrismaClient, userId: string) {
+  const company = await prisma.company.findFirst({ where: { userId } })
   if (!company) return null
   return prisma.loan.findFirst({
     where: { companyId: company.id },
@@ -442,8 +454,8 @@ export async function getActiveLoan(prisma: PrismaClient) {
   })
 }
 
-export async function deductLoanPayment(prisma: PrismaClient) {
-  const company = await prisma.company.findFirstOrThrow()
+export async function deductLoanPayment(prisma: PrismaClient, userId: string) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   const loan = await prisma.loan.findFirst({
     where: { companyId: company.id },
     orderBy: { createdAt: 'desc' },

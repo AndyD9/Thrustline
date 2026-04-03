@@ -113,9 +113,9 @@ export async function getEventHistory(prisma: PrismaClient, companyId: string, l
 
 // ── Cleanup ──────────────────────────────────────────────────────────────
 
-export async function cleanExpiredEvents(prisma: PrismaClient): Promise<number> {
+export async function cleanExpiredEvents(prisma: PrismaClient, companyId: string): Promise<number> {
   const result = await prisma.gameEvent.deleteMany({
-    where: { expiresAt: { lt: new Date() } },
+    where: { companyId, expiresAt: { lt: new Date() } },
   })
   return result.count
 }

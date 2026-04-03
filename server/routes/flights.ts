@@ -4,11 +4,11 @@ import { getAllFlights, getFlightById, createFlight, CreateFlightSchema } from '
 export async function flightRoutes(fastify: FastifyInstance) {
   fastify.get('/api/flights', async (request) => {
     const { limit } = request.query as { limit?: string }
-    return getAllFlights(fastify.prisma, limit ? parseInt(limit, 10) : undefined)
+    return getAllFlights(fastify.prisma, request.userId, limit ? parseInt(limit, 10) : undefined)
   })
 
   fastify.get<{ Params: { id: string } }>('/api/flights/:id', async (request, reply) => {
-    const flight = await getFlightById(fastify.prisma, request.params.id)
+    const flight = await getFlightById(fastify.prisma, request.userId, request.params.id)
     if (!flight) {
       return reply.status(404).send({ error: 'Flight not found', code: 'NOT_FOUND' })
     }
@@ -20,7 +20,7 @@ export async function flightRoutes(fastify: FastifyInstance) {
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.message, code: 'VALIDATION_ERROR' })
     }
-    const flight = await createFlight(fastify.prisma, parsed.data)
+    const flight = await createFlight(fastify.prisma, request.userId, parsed.data)
     return reply.status(201).send(flight)
   })
 }

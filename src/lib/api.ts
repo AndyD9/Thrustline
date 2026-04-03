@@ -3,12 +3,23 @@ import type { AirportInfo } from '../data/airports'
 
 const BASE = 'http://localhost:3000/api'
 
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const session = await window.thrustline.getSession()
+    return session?.access_token ?? null
+  } catch {
+    return null
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const hasBody = options?.body !== undefined && options.body !== null
+  const token = await getAuthToken()
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers: {
       ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   })
