@@ -18,7 +18,11 @@ export default defineConfig({
             rollupOptions: {
               // Externalize all node_modules — they're available at runtime in Electron
               external: (id: string) =>
-                !id.startsWith('.') && !id.startsWith('/') && !id.startsWith('\0'),
+                !id.startsWith('.') &&
+                !id.startsWith('/') &&
+                !id.startsWith('\0') &&
+                !path.isAbsolute(id) &&
+                !id.includes('electron/main'),
             },
           },
         },
