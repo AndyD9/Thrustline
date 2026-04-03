@@ -1,6 +1,6 @@
 # Files
-.PROGRESS.MD
-.PLAN.MD
+**/PROGRESS.md
+**/PLAN.md
 
 # Dependencies
 node_modules/
