@@ -63,8 +63,10 @@ export function generateCrewPool(): CrewCandidate[] {
 
 // ── CRUD ─────────────────────────────────────────────────────────────────
 
-export async function getCrew(prisma: PrismaClient) {
+export async function getCrew(prisma: PrismaClient, userId: string) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   return prisma.crewMember.findMany({
+    where: { companyId: company.id },
     orderBy: [{ aircraftId: 'asc' }, { rank: 'asc' }, { lastName: 'asc' }],
     include: { aircraft: { select: { id: true, name: true, icaoType: true } } },
   })
@@ -77,8 +79,8 @@ export async function getCrewForAircraft(prisma: PrismaClient, aircraftId: strin
   })
 }
 
-export async function hireCrew(prisma: PrismaClient, candidate: CrewCandidate) {
-  const company = await prisma.company.findFirstOrThrow()
+export async function hireCrew(prisma: PrismaClient, userId: string, candidate: CrewCandidate) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
 
   if (company.capital < candidate.salaryMo) {
     throw new Error(`Insufficient capital for first month salary ($${candidate.salaryMo.toLocaleString()}).`)
@@ -151,8 +153,9 @@ export async function addDutyHours(prisma: PrismaClient, aircraftId: string, hou
 
 // ── Monthly salary deduction (called by Electron interval) ───────────────
 
-export async function deductMonthlySalaries(prisma: PrismaClient) {
+export async function deductMonthlySalaries(prisma: PrismaClient, userId: string) {
   const company = await prisma.company.findFirstOrThrow({
+    where: { userId },
     include: { crew: true },
   })
   if (company.crew.length === 0) return

@@ -8,10 +8,14 @@ import { dispatchRoutes } from './routes/dispatch'
 import { airportRoutes } from './routes/airports'
 import { crewRoutes } from './routes/crew'
 import { eventRoutes } from './routes/events'
+import { authMiddleware } from './middleware/auth'
 
 declare module 'fastify' {
   interface FastifyInstance {
     prisma: PrismaClient
+  }
+  interface FastifyRequest {
+    userId: string
   }
 }
 
@@ -25,6 +29,9 @@ export async function createServer() {
   })
 
   fastify.decorate('prisma', prisma)
+
+  // Auth middleware — sets request.userId on every request
+  await fastify.register(authMiddleware)
 
   await fastify.register(flightRoutes)
   await fastify.register(companyRoutes)

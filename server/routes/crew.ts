@@ -23,8 +23,8 @@ const AssignBody = z.object({
 
 export async function crewRoutes(fastify: FastifyInstance) {
   // GET /api/crew — list all crew
-  fastify.get('/api/crew', async () => {
-    return getCrew(fastify.prisma)
+  fastify.get('/api/crew', async (request) => {
+    return getCrew(fastify.prisma, request.userId)
   })
 
   // GET /api/crew/pool — generate hiring candidates
@@ -37,7 +37,7 @@ export async function crewRoutes(fastify: FastifyInstance) {
     const parsed = HireBody.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() })
     try {
-      const member = await hireCrew(fastify.prisma, parsed.data)
+      const member = await hireCrew(fastify.prisma, request.userId, parsed.data)
       return reply.status(201).send(member)
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
@@ -48,7 +48,7 @@ export async function crewRoutes(fastify: FastifyInstance) {
   fastify.delete('/api/crew/:id', async (request, reply) => {
     const { id } = request.params as { id: string }
     try {
-      await fireCrew(fastify.prisma, id)
+      await fireCrew(fastify.prisma, request.userId, id)
       return reply.status(204).send()
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
@@ -61,7 +61,7 @@ export async function crewRoutes(fastify: FastifyInstance) {
     const parsed = AssignBody.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() })
     try {
-      const member = await assignCrew(fastify.prisma, id, parsed.data.aircraftId)
+      const member = await assignCrew(fastify.prisma, request.userId, id, parsed.data.aircraftId)
       return member
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
@@ -72,7 +72,7 @@ export async function crewRoutes(fastify: FastifyInstance) {
   fastify.patch('/api/crew/:id/unassign', async (request, reply) => {
     const { id } = request.params as { id: string }
     try {
-      const member = await unassignCrew(fastify.prisma, id)
+      const member = await unassignCrew(fastify.prisma, request.userId, id)
       return member
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })

@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('thrustline', {
     ipcRenderer.removeAllListeners('event:new')
     ipcRenderer.removeAllListeners('event:expired')
     ipcRenderer.removeAllListeners('loan:payment')
+    ipcRenderer.removeAllListeners('auth:changed')
+    ipcRenderer.removeAllListeners('sync:status')
   },
 
   onSimStatus: (callback) => {
@@ -70,6 +72,24 @@ contextBridge.exposeInMainWorld('thrustline', {
   onLoanPayment: (callback) => {
     ipcRenderer.removeAllListeners('loan:payment')
     ipcRenderer.on('loan:payment', () => callback())
+  },
+
+  // Auth
+  signUp:              (email, password) => ipcRenderer.invoke('auth:signUp', email, password),
+  signIn:              (email, password) => ipcRenderer.invoke('auth:signInEmail', email, password),
+  signInOAuth:         (provider)        => ipcRenderer.invoke('auth:signInOAuth', provider),
+  signOut:             ()                => ipcRenderer.invoke('auth:signOut'),
+  getSession:          ()                => ipcRenderer.invoke('auth:getSession'),
+  onAuthChange: (callback) => {
+    ipcRenderer.removeAllListeners('auth:changed')
+    ipcRenderer.on('auth:changed', (_event, session) => callback(session))
+  },
+
+  // Sync
+  syncNow:             ()  => ipcRenderer.invoke('sync:pushNow'),
+  onSyncStatus: (callback) => {
+    ipcRenderer.removeAllListeners('sync:status')
+    ipcRenderer.on('sync:status', (_event, status) => callback(status))
   },
 
   openExternal:        (url)    => ipcRenderer.invoke('shell:openExternal', url),

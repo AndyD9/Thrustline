@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { SimProvider } from './contexts/SimContext'
+import { SyncProvider } from './contexts/SyncContext'
 import { Layout } from './components/Layout'
 import { Dashboard } from './pages/Dashboard'
 import { Flights } from './pages/Flights'
@@ -11,25 +13,47 @@ import { Settings } from './pages/Settings'
 import { DispatchPage } from './pages/Dispatch'
 import { CrewPage } from './pages/Crew'
 import { OnboardingPage } from './pages/Onboarding'
+import Auth from './pages/Auth'
 import { api } from './lib/api'
 
 function AppRoutes() {
+  const { user, loading: authLoading } = useAuth()
   const [onboarded, setOnboarded] = useState<boolean | null>(null) // null = loading
 
   useEffect(() => {
+    if (!user) { setOnboarded(null); return }
     api.get<{ onboarded?: boolean }>('/company')
       .then((c) => setOnboarded(c?.onboarded === true))
       .catch(() => setOnboarded(false))
-  }, [])
+  }, [user])
 
   const handleOnboardingComplete = useCallback(() => {
     setOnboarded(true)
   }, [])
 
+  // Auth loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <p className="text-zinc-500 text-sm">Loading...</p>
+      </div>
+    )
+  }
+
+  // Not authenticated → auth page
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="*" element={<Auth />} />
+      </Routes>
+    )
+  }
+
+  // Authenticated but checking onboarding
   if (onboarded === null) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Loading…</p>
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <p className="text-zinc-500 text-sm">Loading...</p>
       </div>
     )
   }
@@ -63,10 +87,14 @@ function AppRoutes() {
 
 export function App() {
   return (
-    <SimProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </SimProvider>
+    <AuthProvider>
+      <SimProvider>
+        <SyncProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </SyncProvider>
+      </SimProvider>
+    </AuthProvider>
   )
 }

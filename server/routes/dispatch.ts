@@ -11,8 +11,8 @@ import {
 
 export async function dispatchRoutes(fastify: FastifyInstance) {
   // GET /api/dispatches
-  fastify.get('/api/dispatches', async () => {
-    return getDispatches(fastify.prisma)
+  fastify.get('/api/dispatches', async (request) => {
+    return getDispatches(fastify.prisma, request.userId)
   })
 
   // POST /api/dispatches  { originIcao, destIcao, distanceNm, aircraftId? }
@@ -20,7 +20,7 @@ export async function dispatchRoutes(fastify: FastifyInstance) {
     const parsed = CreateDispatchSchema.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() })
     try {
-      const dispatch = await createDispatch(fastify.prisma, parsed.data)
+      const dispatch = await createDispatch(fastify.prisma, request.userId, parsed.data)
       return reply.status(201).send(dispatch)
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
@@ -31,7 +31,7 @@ export async function dispatchRoutes(fastify: FastifyInstance) {
   fastify.delete('/api/dispatches/:id', async (request, reply) => {
     const { id } = request.params as { id: string }
     try {
-      await deleteDispatch(fastify.prisma, id)
+      await deleteDispatch(fastify.prisma, request.userId, id)
       return reply.status(204).send()
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
@@ -43,7 +43,7 @@ export async function dispatchRoutes(fastify: FastifyInstance) {
     const { id }     = request.params as { id: string }
     const { status } = request.body   as { status: string }
     try {
-      return await setDispatchStatus(fastify.prisma, id, status)
+      return await setDispatchStatus(fastify.prisma, request.userId, id, status)
     } catch (err: unknown) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) })
     }
@@ -59,7 +59,7 @@ export async function dispatchRoutes(fastify: FastifyInstance) {
     const url     = buildSimbriefUrl(dispatch, company?.airlineCode ?? 'THL')
 
     // Mark as "dispatched" when the URL is requested (user opened SimBrief)
-    await setDispatchStatus(fastify.prisma, id, 'dispatched')
+    await setDispatchStatus(fastify.prisma, request.userId, id, 'dispatched')
     return { url }
   })
 
@@ -70,6 +70,7 @@ export async function dispatchRoutes(fastify: FastifyInstance) {
     try {
       const ofp = await fetchSimbriefOFP(
         fastify.prisma,
+        request.userId,
         id,
         company?.simbriefUsername ?? '',
       )

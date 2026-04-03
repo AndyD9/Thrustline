@@ -218,9 +218,42 @@ export interface CatalogEntry {
   mtowLbs: number
 }
 
+// ── Auth ─────────────────────────────────────────────────────────────────
+
+export interface AuthSession {
+  access_token: string
+  refresh_token: string
+  user: AuthUser
+}
+
+export interface AuthUser {
+  id: string
+  email?: string
+  user_metadata?: Record<string, unknown>
+}
+
+export interface AuthResult {
+  user?: AuthUser | null
+  session?: AuthSession | null
+  error?: string
+}
+
 // ── Preload API ───────────────────────────────────────────────────────────
 
 interface ThrustlineAPI {
+  // Auth
+  signUp:             (email: string, password: string) => Promise<AuthResult>
+  signIn:             (email: string, password: string) => Promise<AuthResult>
+  signInOAuth:        (provider: 'discord' | 'google') => Promise<{ url?: string; error?: string }>
+  signOut:            () => Promise<{ ok: boolean }>
+  getSession:         () => Promise<AuthSession | null>
+  onAuthChange:       (callback: (session: AuthSession | null) => void) => void
+
+  // Sync
+  syncNow:            () => Promise<void>
+  onSyncStatus:       (callback: (status: 'idle' | 'syncing' | 'error' | 'offline') => void) => void
+
+  // Sim & events
   onSimData: (callback: (data: SimData) => void) => void
   offAll: () => void
   onSimStatus: (callback: (status: string) => void) => void

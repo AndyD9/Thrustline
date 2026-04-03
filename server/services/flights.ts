@@ -18,8 +18,10 @@ export const CreateFlightSchema = z.object({
 
 export type CreateFlightInput = z.infer<typeof CreateFlightSchema>
 
-export async function getAllFlights(prisma: PrismaClient, limit = 50) {
+export async function getAllFlights(prisma: PrismaClient, userId: string, limit = 50) {
+  const company = await prisma.company.findFirstOrThrow({ where: { userId } })
   return prisma.flight.findMany({
+    where: { companyId: company.id },
     orderBy: { createdAt: 'desc' },
     take: limit,
     include: { aircraft: true },
@@ -33,7 +35,9 @@ export async function getFlightById(prisma: PrismaClient, id: string) {
   })
 }
 
-export async function createFlight(prisma: PrismaClient, data: CreateFlightInput) {
+export async function createFlight(prisma: PrismaClient, userId: string, data: CreateFlightInput) {
   const validated = CreateFlightSchema.parse(data)
+  // Verify the company belongs to this user
+  await prisma.company.findFirstOrThrow({ where: { userId, id: validated.companyId } })
   return prisma.flight.create({ data: validated })
 }

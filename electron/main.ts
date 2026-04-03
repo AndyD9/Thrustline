@@ -9,6 +9,8 @@ const __dirname  = path.dirname(__filename)
 
 import { createServer } from '../server'
 import { startSimConnect } from './simconnect/bridge'
+import { getSupabaseClient, setSessionFromTokens } from './supabase'
+import { createSyncEngine } from './sync/syncEngine'
 import { createFlightDetector } from './simconnect/flightDetector'
 import { createFlight } from '../server/services/flights'
 import { computeYield } from '../server/services/yield'
@@ -23,6 +25,7 @@ import type { PrismaClient } from '@prisma/client'
 import type { SimData, FlightRecord } from './simconnect/types'
 
 let mainWindow: BrowserWindow | null = null
+let currentUserId: string | null = null
 
 // ── Desktop notification helper ───────────────────────────────────────────
 
@@ -35,7 +38,9 @@ function notify(title: string, body: string) {
 // ── Get company ID (may not exist yet if onboarding hasn't completed) ────
 
 async function getCompanyId(prisma: PrismaClient): Promise<string | null> {
-  const company = await prisma.company.findFirst({ where: { onboarded: true } })
+  const where: Record<string, unknown> = { onboarded: true }
+  if (currentUserId) where.userId = currentUserId
+  const company = await prisma.company.findFirst({ where })
   return company?.id ?? null
 }
 
@@ -118,6 +123,100 @@ async function main() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+
+  // ── Auth IPC handlers ─────────────────────────────────────────────────────
+
+  ipcMain.handle('auth:signUp', async (_event, email: string, password: string) => {
+    const sb = getSupabaseClient()
+    const { data, error } = await sb.auth.signUp({ email, password })
+    if (error) return { error: error.message }
+    if (data.user) currentUserId = data.user.id
+    return { user: data.user, session: data.session }
+  })
+
+  ipcMain.handle('auth:signInEmail', async (_event, email: string, password: string) => {
+    const sb = getSupabaseClient()
+    const { data, error } = await sb.auth.signInWithPassword({ email, password })
+    if (error) return { error: error.message }
+    if (data.user) currentUserId = data.user.id
+    mainWindow?.webContents.send('auth:changed', data.session)
+    return { user: data.user, session: data.session }
+  })
+
+  ipcMain.handle('auth:signInOAuth', async (_event, provider: 'discord' | 'google') => {
+    const sb = getSupabaseClient()
+    const { data, error } = await sb.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: 'thrustline://auth/callback' },
+    })
+    if (error) return { error: error.message }
+
+    // Open OAuth URL in a popup BrowserWindow
+    if (data.url) {
+      const authWindow = new BrowserWindow({
+        width: 600, height: 700,
+        parent: mainWindow ?? undefined,
+        modal: true,
+        webPreferences: { nodeIntegration: false, contextIsolation: true },
+      })
+      authWindow.loadURL(data.url)
+
+      // Listen for the deep-link redirect
+      const handleRedirect = (url: string) => {
+        if (!url.startsWith('thrustline://auth/callback')) return
+        const hash = url.split('#')[1] || ''
+        const params = new URLSearchParams(hash)
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+        if (accessToken && refreshToken) {
+          setSessionFromTokens(accessToken, refreshToken)
+            .then(async (session) => {
+              if (session?.user) currentUserId = session.user.id
+              mainWindow?.webContents.send('auth:changed', session)
+            })
+            .catch(console.error)
+        }
+        authWindow.close()
+      }
+
+      authWindow.webContents.on('will-navigate', (_e, url) => handleRedirect(url))
+      authWindow.webContents.on('will-redirect', (_e, url) => handleRedirect(url))
+    }
+
+    return { url: data.url }
+  })
+
+  ipcMain.handle('auth:signOut', async () => {
+    const sb = getSupabaseClient()
+    await sb.auth.signOut()
+    currentUserId = null
+    mainWindow?.webContents.send('auth:changed', null)
+    return { ok: true }
+  })
+
+  ipcMain.handle('auth:getSession', async () => {
+    const sb = getSupabaseClient()
+    const { data } = await sb.auth.getSession()
+    if (data.session?.user) currentUserId = data.session.user.id
+    return data.session
+  })
+
+  // Handle OAuth deep-link on macOS
+  app.on('open-url', (_event, url) => {
+    if (!url.startsWith('thrustline://auth/callback')) return
+    const hash = url.split('#')[1] || ''
+    const params = new URLSearchParams(hash)
+    const accessToken = params.get('access_token')
+    const refreshToken = params.get('refresh_token')
+    if (accessToken && refreshToken) {
+      setSessionFromTokens(accessToken, refreshToken)
+        .then(async (session) => {
+          if (session?.user) currentUserId = session.user.id
+          mainWindow?.webContents.send('auth:changed', session)
+        })
+        .catch(console.error)
+    }
+  })
 
   // ── processLanding ────────────────────────────────────────────────────────
 
@@ -433,6 +532,35 @@ async function main() {
     }
   }, EVENT_INTERVAL_MS)
 
+  // ── Sync engine ────────────────────────────────────────────────────────────
+
+  let syncEngine: ReturnType<typeof createSyncEngine> | null = null
+
+  function initSyncEngine() {
+    if (!currentUserId || syncEngine) return
+    try {
+      const sb = getSupabaseClient()
+      syncEngine = createSyncEngine(prisma, sb, currentUserId)
+      syncEngine.onStatus((s) => mainWindow?.webContents.send('sync:status', s))
+      syncEngine.pullOnStartup().then(() => syncEngine!.start()).catch(console.error)
+      console.log('[Thrustline] Sync engine started')
+    } catch (err) {
+      console.error('[Thrustline] Sync engine init failed:', err)
+    }
+  }
+
+  // Start sync engine once userId is available (after auth)
+  ipcMain.handle('sync:pushNow', async () => {
+    await syncEngine?.pushNow()
+  })
+
+  // Listen for auth changes to start sync
+  const originalOnAuthChanged = () => {
+    if (currentUserId && !syncEngine) initSyncEngine()
+  }
+  // Check on a short delay after auth handlers fire
+  setInterval(() => { if (currentUserId && !syncEngine) initSyncEngine() }, 5000)
+
   // ── Cleanup ───────────────────────────────────────────────────────────────
 
   mainWindow.on('closed', () => { mainWindow = null })
@@ -440,10 +568,15 @@ async function main() {
   app.on('before-quit', async () => {
     clearInterval(leaseInterval)
     clearInterval(eventInterval)
+    syncEngine?.stop()
+    await syncEngine?.pushNow().catch(() => {})
     simBridge.stop()
     await fastify.close()
   })
 }
+
+// Register deep-link protocol for OAuth callbacks
+app.setAsDefaultProtocolClient('thrustline')
 
 app.whenReady().then(main)
 

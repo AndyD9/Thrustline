@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { SimStatus } from './SimStatus'
 import { LiveFlightBar } from './LiveFlightBar'
+import { SyncIndicator } from './SyncIndicator'
 
 interface NavItem {
   to: string
@@ -53,9 +54,10 @@ export function Layout() {
           ))}
         </nav>
 
-        {/* SimStatus at bottom */}
-        <div className="px-5 py-4 border-t border-gray-800">
+        {/* SimStatus + Sync at bottom */}
+        <div className="px-5 py-4 border-t border-gray-800 space-y-2">
           <SimStatus />
+          <SyncIndicator />
         </div>
       </aside>
 
