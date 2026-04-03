@@ -30,6 +30,7 @@
       "dist-electron/**/*",
       "electron/preload.cjs",
       "node_modules/**/*",
+      "node_modules/.prisma/**/*",
       "prisma/**/*"
     ],
     "extraResources": [
