@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx tsc:*)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill:*)",
+      "Bash(node scripts/fetch-airports.mjs)",
+      "Bash(node -e \":*)",
+      "Bash(node -e \"const p=require\\(''./node_modules/react-map-gl/package.json''\\); console.log\\(''react-map-gl:'', p.version\\)\")",
+      "Bash(node -e \"const p=require\\(''./node_modules/maplibre-gl/package.json''\\); console.log\\(''maplibre-gl:'', p.version\\)\")",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

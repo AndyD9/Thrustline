@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id               String       @id @default(cuid())
+  name             String
+  capital          Float        @default(1000000)
+  hubIcao          String?
+  activeAircraftId String?
+  airlineCode      String       @default("THL")
+  simbriefUsername String?
+  onboarded        Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  flights          Flight[]
+  fleet            Aircraft[]
+  routes           Route[]
+  dispatches       Dispatch[]
+  crew             CrewMember[]
+  reputations      Reputation[]
+  events           GameEvent[]
+  loans            Loan[]
+}
+
+model Loan {
+  id              String   @id @default(cuid())
+  principal       Float
+  monthlyPayment  Float
+  remainingAmount Float
+  totalMonths     Int
+  paidMonths      Int      @default(0)
+  interestRate    Float
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  createdAt       DateTime @default(now())
+}
+
+model Dispatch {
+  id            String   @id @default(cuid())
+  flightNumber  String
+  originIcao    String
+  destIcao      String
+  icaoType      String
+  distanceNm    Float
+  ecoPax        Int
+  bizPax        Int
+  cargoKg       Float
+  estimFuelLbs  Float
+  cruiseAlt     Int
+  // pending → dispatched (SimBrief opened) → flying → completed
+  status        String   @default("pending")
+  ofpData       String?  // raw JSON from SimBrief OFP API
+  flightId      String?  // linked after landing
+  aircraftId    String?
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model Aircraft {
+  id            String    @id @default(cuid())
+  name          String
+  icaoType      String
+  healthPct     Float     @default(100)
+  leaseCostMo   Float
+  totalHours    Float     @default(0)
+  cycles        Int       @default(0)
+  ownership     String       @default("leased")  // "leased" | "owned"
+  purchasePrice Float?
+  purchasedAt   DateTime?
+  companyId     String
+  company       Company      @relation(fields: [companyId], references: [id])
+  flights       Flight[]
+  crew          CrewMember[]
+}
+
+model Flight {
+  id            String    @id @default(cuid())
+  departureIcao String
+  arrivalIcao   String
+  durationMin   Int
+  fuelUsedGal   Float
+  distanceNm    Float
+  landingVsFpm  Float
+  revenue       Float     @default(0)
+  fuelCost      Float     @default(0)
+  landingFee    Float     @default(0)
+  netResult     Float     @default(0)
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+  aircraftId    String?
+  aircraft      Aircraft? @relation(fields: [aircraftId], references: [id])
+  createdAt     DateTime  @default(now())
+}
+
+model Route {
+  id         String  @id @default(cuid())
+  originIcao String
+  destIcao   String
+  distanceNm Float
+  basePrice  Float
+  active     Boolean @default(true)
+  companyId  String
+  company    Company @relation(fields: [companyId], references: [id])
+}
+
+model GameEvent {
+  id          String   @id @default(cuid())
+  type        String                          // "fuel_spike" | "fuel_drop" | "weather" | "tourism_boom" | "strike" | "mechanical"
+  scope       String                          // "global" | "route" | "aircraft"
+  targetId    String?                         // route key "LFPG-KLAX" or aircraftId depending on scope
+  title       String
+  description String
+  modifier    Float    @default(1.0)          // multiplier (fuel ×1.3, loadFactor ×1.15, 0 = blocked)
+  startsAt    DateTime @default(now())
+  expiresAt   DateTime
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+}
+
+model Reputation {
+  id          String  @id @default(cuid())
+  originIcao  String
+  destIcao    String
+  score       Float   @default(50)   // 0–100, 50 = neutral
+  flightCount Int     @default(0)
+  companyId   String
+  company     Company @relation(fields: [companyId], references: [id])
+
+  @@unique([originIcao, destIcao, companyId])
+}
+
+model CrewMember {
+  id          String    @id @default(cuid())
+  firstName   String
+  lastName    String
+  rank        String    @default("first_officer") // "captain" | "first_officer"
+  experience  Int       @default(1)               // 1–10
+  salaryMo    Float
+  dutyHours   Float     @default(0)               // hours flown this month
+  maxDutyH    Float     @default(80)              // max hours per month
+  status      String    @default("available")     // "available" | "flying" | "resting"
+  aircraftId  String?
+  aircraft    Aircraft? @relation(fields: [aircraftId], references: [id])
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  hiredAt     DateTime  @default(now())
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  type        String
+  amount      Float
+  description String
+  flightId    String?
+  companyId   String
+  createdAt   DateTime @default(now())
+}
