@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
-import { PrismaClient } from '@prisma/client'
+import pkg from '@prisma/client'
+const { PrismaClient } = pkg
 import { flightRoutes } from './routes/flights'
 import { companyRoutes } from './routes/company'
 import { routeRoutes } from './routes/routes'
