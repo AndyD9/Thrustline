@@ -25,20 +25,13 @@
     "directories": {
       "output": "release"
     },
+    "asar": false,
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
       "electron/preload.cjs",
       "node_modules/**/*",
       "prisma/**/*"
-    ],
-    "asarUnpack": [
-      "node_modules/.prisma/**/*",
-      "node_modules/@prisma/client/**/*",
-      "node_modules/@prisma/engines/**/*",
-      "node_modules/node-simconnect/**/*",
-      "**/*.node",
-      "**/*.wasm"
     ],
     "extraResources": [
       {
