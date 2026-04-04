@@ -1,0 +1,76 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ── Color Palette (zinc/emerald dark theme) ──────────────────── -->
+    <Color x:Key="Zinc950">#FF09090B</Color>
+    <Color x:Key="Zinc900">#FF18181B</Color>
+    <Color x:Key="Zinc800">#FF27272A</Color>
+    <Color x:Key="Zinc700">#FF3F3F46</Color>
+    <Color x:Key="Zinc400">#FFA1A1AA</Color>
+    <Color x:Key="Zinc300">#FFD4D4D8</Color>
+    <Color x:Key="Zinc100">#FFF4F4F5</Color>
+    <Color x:Key="Emerald400">#FF34D399</Color>
+    <Color x:Key="Emerald500">#FF10B981</Color>
+    <Color x:Key="Red400">#FFF87171</Color>
+    <Color x:Key="Amber400">#FFFBBF24</Color>
+
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource Zinc950}" />
+    <SolidColorBrush x:Key="SidebarBrush" Color="{StaticResource Zinc900}" />
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource Zinc800}" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource Zinc900}" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource Zinc100}" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource Zinc400}" />
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Emerald400}" />
+    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource Red400}" />
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Amber400}" />
+
+    <!-- ── Global text style ────────────────────────────────────────── -->
+    <Style TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <!-- ── Button style ─────────────────────────────────────────────── -->
+    <Style TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource BackgroundBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="6"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── TextBox style ────────────────────────────────────────────── -->
+    <Style TargetType="TextBox">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CaretBrush" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- ── Card style ───────────────────────────────────────────────── -->
+    <Style x:Key="Card" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="16" />
+    </Style>
+
+</ResourceDictionary>
