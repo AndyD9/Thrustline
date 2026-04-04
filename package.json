@@ -15,9 +15,9 @@
     "prisma:studio": "prisma studio",
     "airports:fetch": "node scripts/fetch-airports.mjs",
     "build:electron": "tsc && vite build",
-    "build:win": "npm run build:electron && electron-builder --win",
-    "build:mac": "npm run build:electron && electron-builder --mac",
-    "build:linux": "npm run build:electron && electron-builder --linux"
+    "build:win": "prisma generate && npm run build:electron && electron-builder --win",
+    "build:mac": "prisma generate && npm run build:electron && electron-builder --mac",
+    "build:linux": "prisma generate && npm run build:electron && electron-builder --linux"
   },
   "build": {
     "appId": "com.thrustline.app",
@@ -30,7 +30,6 @@
       "dist-electron/**/*",
       "electron/preload.cjs",
       "node_modules/**/*",
-      "node_modules/.prisma/**/*",
       "prisma/**/*"
     ],
     "asarUnpack": [
@@ -38,7 +37,8 @@
       "node_modules/@prisma/client/**/*",
       "node_modules/@prisma/engines/**/*",
       "node_modules/node-simconnect/**/*",
-      "**/*.node"
+      "**/*.node",
+      "**/*.wasm"
     ],
     "extraResources": [
       {
