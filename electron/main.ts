@@ -2,7 +2,6 @@ import { app, BrowserWindow, ipcMain, Notification, dialog, shell } from 'electr
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
-import { execSync } from 'node:child_process'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname  = path.dirname(__filename)
@@ -47,18 +46,12 @@ async function getCompanyId(prisma: PrismaClient): Promise<string | null> {
 // ── Main ──────────────────────────────────────────────────────────────────
 
 async function main() {
-  // Ensure DB schema is up to date (creates dev.db if missing)
-  try {
-    execSync('npx prisma migrate deploy', { stdio: 'pipe', cwd: process.cwd() })
-    console.log('[Thrustline] Database migrations applied')
-  } catch (err) {
-    console.error('[Thrustline] Migration failed — trying db push:', err)
-    try {
-      execSync('npx prisma db push', { stdio: 'pipe', cwd: process.cwd() })
-      console.log('[Thrustline] Database schema pushed')
-    } catch (pushErr) {
-      console.error('[Thrustline] DB push also failed:', pushErr)
-    }
+  // Set DATABASE_URL to a stable location for packaged builds
+  const isProd = !process.env.VITE_DEV_SERVER_URL
+  if (isProd) {
+    const dbPath = path.join(app.getPath('userData'), 'thrustline.db')
+    process.env.DATABASE_URL = `file:${dbPath}`
+    console.log(`[Thrustline] Database path: ${dbPath}`)
   }
 
   const { fastify, prisma } = await createServer()
