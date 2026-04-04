@@ -2,7 +2,7 @@
  * CashflowEngine — calcule les coûts d'un vol, crée les Transactions,
  * met à jour Company.capital.
  */
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '../../generated/prisma/client'
 
 const FUEL_PRICE_PER_GAL = parseFloat(process.env.FUEL_PRICE_PER_GAL ?? '3.20')
 

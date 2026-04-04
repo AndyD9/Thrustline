@@ -31,6 +31,7 @@
       "dist-electron/**/*",
       "electron/preload.cjs",
       "node_modules/**/*",
+      "generated/**/*",
       "prisma/**/*"
     ],
     "extraResources": [
@@ -60,7 +61,8 @@
   "license": "ISC",
   "dependencies": {
     "@fastify/cors": "^11.2.0",
-    "@prisma/client": "^6.19.2",
+    "@prisma/adapter-better-sqlite3": "^7.6.0",
+    "@prisma/client": "^7.6.0",
     "@supabase/supabase-js": "^2.101.1",
     "fastify": "^5.8.4",
     "maplibre-gl": "^5.21.1",
@@ -78,7 +80,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "electron": "^41.1.1",
     "electron-builder": "^26.8.2",
-    "prisma": "^6.19.2",
+    "prisma": "^7.6.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
     "vite": "^6.4.1",

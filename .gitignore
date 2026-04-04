@@ -9,6 +9,9 @@ node_modules/
 dist/
 dist-electron/
 
+# Generated Prisma client
+generated/
+
 # Environment
 .env
 .env.*
