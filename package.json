@@ -33,6 +33,10 @@
       "node_modules/.prisma/**/*",
       "prisma/**/*"
     ],
+    "asarUnpack": [
+      "node_modules/.prisma/**/*",
+      "node_modules/@prisma/client/**/*"
+    ],
     "extraResources": [
       {
         "from": "prisma",
