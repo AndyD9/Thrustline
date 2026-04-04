@@ -110,7 +110,7 @@ async function main() {
     webPreferences: {
       preload: process.env.VITE_DEV_SERVER_URL
         ? path.join(process.cwd(), 'electron', 'preload.cjs')
-        : path.join(__dirname, 'preload.cjs'),
+        : path.join(__dirname, '..', 'electron', 'preload.cjs'),
       nodeIntegration:  false,
       contextIsolation: true,
     },
