@@ -1,6 +1,6 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
-import { PrismaClient } from '../generated/prisma/client'
+import { PrismaClient } from '../generated/prisma/client/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { flightRoutes } from './routes/flights'
 import { companyRoutes } from './routes/company'

@@ -1,4 +1,4 @@
-import type { PrismaClient, GameEvent } from '../../generated/prisma/client'
+import type { PrismaClient, GameEvent } from '../../generated/prisma/client/client'
 
 // ── Event templates ──────────────────────────────────────────────────────
 

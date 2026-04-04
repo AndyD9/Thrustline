@@ -21,7 +21,7 @@ import { deductMonthlySalaries, addDutyHours } from '../server/services/crew'
 import { getRouteReputation, updateReputation } from '../server/services/reputation'
 import { rollRandomEvent, getActiveEvents, getFuelMultiplier, getRouteLoadBonus, cleanExpiredEvents } from '../server/services/events'
 import { findActiveDispatch, linkFlightToDispatch, setDispatchStatus } from '../server/services/dispatch'
-import type { PrismaClient } from '../generated/prisma/client'
+import type { PrismaClient } from '../generated/prisma/client/client'
 import type { SimData, FlightRecord } from './simconnect/types'
 
 let mainWindow: BrowserWindow | null = null
