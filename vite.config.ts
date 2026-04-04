@@ -1,14 +1,11 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), 'VITE_')
-
-  return {
+export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
@@ -16,10 +13,6 @@ export default defineConfig(({ mode }) => {
       {
         entry: 'electron/main.ts',
         vite: {
-          define: {
-            __SUPABASE_URL__: JSON.stringify(env.VITE_SUPABASE_URL),
-            __SUPABASE_ANON_KEY__: JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
-          },
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
@@ -45,5 +38,4 @@ export default defineConfig(({ mode }) => {
       '@': path.resolve(__dirname, 'src'),
     },
   },
-  }
 })
