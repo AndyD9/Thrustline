@@ -6,7 +6,7 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <!-- <ApplicationIcon>Assets\icon.ico</ApplicationIcon> -->
     <RootNamespace>Thrustline</RootNamespace>
     <AssemblyName>Thrustline</AssemblyName>
   </PropertyGroup>
