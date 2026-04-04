@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname  = path.dirname(__filename)
 
 import { createServer } from '../server'
+import { ensureSchema } from './migrateDb'
 import { startSimConnect } from './simconnect/bridge'
 import { getSupabaseClient, setSessionFromTokens } from './supabase'
 import { createSyncEngine } from './sync/syncEngine'
@@ -48,11 +49,15 @@ async function getCompanyId(prisma: PrismaClient): Promise<string | null> {
 async function main() {
   // Set DATABASE_URL to a stable location for packaged builds
   const isProd = !process.env.VITE_DEV_SERVER_URL
-  if (isProd) {
-    const dbPath = path.join(app.getPath('userData'), 'thrustline.db')
-    process.env.DATABASE_URL = `file:${dbPath}`
-    console.log(`[Thrustline] Database path: ${dbPath}`)
-  }
+  const dbPath = isProd
+    ? path.join(app.getPath('userData'), 'thrustline.db')
+    : path.join(process.cwd(), 'prisma', 'dev.db')
+  process.env.DATABASE_URL = `file:${dbPath}`
+  console.log(`[Thrustline] Database path: ${dbPath}`)
+
+  // Create tables if they don't exist (safe to run every startup)
+  ensureSchema(dbPath)
+  console.log('[Thrustline] Schema ensured')
 
   const { fastify, prisma } = await createServer()
 
