@@ -14,7 +14,7 @@
             <StackPanel Margin="32">
 
                 <!-- Logo / Title -->
-                <TextBlock Text="THRUSTLINE" FontSize="28" FontWeight="Bold" LetterSpacing="2"
+                <TextBlock Text="T H R U S T L I N E" FontSize="28" FontWeight="Bold"
                            Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                 <TextBlock Text="Virtual Airline Manager" FontSize="12"
                            Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,28"/>
