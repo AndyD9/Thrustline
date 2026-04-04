@@ -602,6 +602,13 @@ async function main() {
 // Register deep-link protocol for OAuth callbacks
 app.setAsDefaultProtocolClient('thrustline')
 
-app.whenReady().then(main)
+app.whenReady().then(main).catch((err) => {
+  const logPath = path.join(app.getPath('userData'), 'crash.log')
+  const msg = `[${new Date().toISOString()}] Startup crash:\n${err?.stack || err}\n`
+  fs.appendFileSync(logPath, msg)
+  console.error('[Thrustline] Fatal startup error:', err)
+  dialog.showErrorBox('Thrustline — startup error', String(err?.message || err))
+  app.quit()
+})
 
 app.on('window-all-closed', () => { app.quit() })
