@@ -17,14 +17,12 @@ export default defineConfig({
             outDir: 'dist-electron',
             rollupOptions: {
               // Externalize all node_modules — they're available at runtime in Electron
-              external: (id: string) => {
-                // Always bundle the entry point and virtual modules
-                if (id.startsWith('\0') || id.includes('electron/main')) return false
-                // Externalize the generated Prisma client (native modules)
-                if (id.includes('generated/prisma')) return true
-                // Externalize all non-relative, non-absolute imports (node_modules)
-                return !id.startsWith('.') && !id.startsWith('/') && !path.isAbsolute(id)
-              },
+              external: (id: string) =>
+                !id.startsWith('.') &&
+                !id.startsWith('/') &&
+                !id.startsWith('\0') &&
+                !path.isAbsolute(id) &&
+                !id.includes('electron/main'),
             },
           },
         },

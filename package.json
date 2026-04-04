@@ -31,7 +31,6 @@
       "dist-electron/**/*",
       "electron/preload.cjs",
       "node_modules/**/*",
-      "generated/**/*",
       "prisma/**/*"
     ],
     "extraResources": [

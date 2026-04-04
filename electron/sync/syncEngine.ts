@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../../generated/prisma/client'
+import type { PrismaClient } from '../../generated/prisma/client/client'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline'

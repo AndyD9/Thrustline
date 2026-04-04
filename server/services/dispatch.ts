@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../../generated/prisma/client'
+import type { PrismaClient } from '../../generated/prisma/client/client'
 import { z } from 'zod'
 import { CATALOG_BY_TYPE } from './company'
 import { getCrewForAircraft } from './crew'
