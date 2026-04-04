@@ -1,7 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
-import pkg from '@prisma/client'
-const { PrismaClient } = pkg
+import { PrismaClient } from '../generated/prisma/client'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { flightRoutes } from './routes/flights'
 import { companyRoutes } from './routes/company'
 import { routeRoutes } from './routes/routes'
@@ -13,7 +13,7 @@ import { authMiddleware } from './middleware/auth'
 
 declare module 'fastify' {
   interface FastifyInstance {
-    prisma: PrismaClient
+    prisma: InstanceType<typeof PrismaClient>
   }
   interface FastifyRequest {
     userId: string
@@ -21,7 +21,10 @@ declare module 'fastify' {
 }
 
 export async function createServer() {
-  const prisma = new PrismaClient()
+  const adapter = new PrismaBetterSqlite3({
+    url: process.env.DATABASE_URL || 'file:./prisma/dev.db',
+  })
+  const prisma = new PrismaClient({ adapter })
   const fastify = Fastify({ logger: false })
 
   await fastify.register(cors, {

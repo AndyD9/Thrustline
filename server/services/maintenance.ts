@@ -2,7 +2,7 @@
  * MaintenanceEngine — calcule l'usure de l'avion après chaque vol,
  * crée les Transactions de maintenance si nécessaire.
  */
-import type { PrismaClient, Prisma } from '@prisma/client'
+import type { PrismaClient, Prisma } from '../../generated/prisma/client'
 
 // Usure par heure de vol (%)
 const WEAR_PER_FLIGHT_HOUR = 0.1

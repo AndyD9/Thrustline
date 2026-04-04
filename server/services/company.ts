@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '../../generated/prisma/client'
 
 // Coût de maintenance : 500$ par point de santé à récupérer
 const MAINTENANCE_COST_PER_PCT = 500

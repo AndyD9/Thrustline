@@ -21,7 +21,7 @@ import { deductMonthlySalaries, addDutyHours } from '../server/services/crew'
 import { getRouteReputation, updateReputation } from '../server/services/reputation'
 import { rollRandomEvent, getActiveEvents, getFuelMultiplier, getRouteLoadBonus, cleanExpiredEvents } from '../server/services/events'
 import { findActiveDispatch, linkFlightToDispatch, setDispatchStatus } from '../server/services/dispatch'
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '../generated/prisma/client'
 import type { SimData, FlightRecord } from './simconnect/types'
 
 let mainWindow: BrowserWindow | null = null
@@ -54,7 +54,7 @@ async function main() {
   } catch (err) {
     console.error('[Thrustline] Migration failed — trying db push:', err)
     try {
-      execSync('npx prisma db push --skip-generate', { stdio: 'pipe', cwd: process.cwd() })
+      execSync('npx prisma db push', { stdio: 'pipe', cwd: process.cwd() })
       console.log('[Thrustline] Database schema pushed')
     } catch (pushErr) {
       console.error('[Thrustline] DB push also failed:', pushErr)
