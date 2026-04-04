@@ -22,8 +22,9 @@ let client: SupabaseClient | null = null
 export function getSupabaseClient(): SupabaseClient {
   if (client) return client
 
-  const url = import.meta.env.VITE_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY
+  // __SUPABASE_URL__ and __SUPABASE_ANON_KEY__ are injected by Vite's define at build time
+  const url = __SUPABASE_URL__
+  const anonKey = __SUPABASE_ANON_KEY__
 
   if (!url || !anonKey) {
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in env')

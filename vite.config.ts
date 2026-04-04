@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => {
         entry: 'electron/main.ts',
         vite: {
           define: {
-            'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
-            'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
+            __SUPABASE_URL__: JSON.stringify(env.VITE_SUPABASE_URL),
+            __SUPABASE_ANON_KEY__: JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
           },
           build: {
             outDir: 'dist-electron',
