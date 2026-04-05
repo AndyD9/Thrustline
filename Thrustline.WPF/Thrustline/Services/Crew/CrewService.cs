@@ -45,7 +45,8 @@ public class CrewService
     public async Task<List<CrewMember>> GetCrewAsync(string userId)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var company = await db.Companies.FirstAsync(c => c.UserId == userId);
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.UserId == userId);
+        if (company == null) return new();
         return await db.CrewMembers
             .Include(c => c.Aircraft)
             .Where(c => c.CompanyId == company.Id)

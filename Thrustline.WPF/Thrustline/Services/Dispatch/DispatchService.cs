@@ -91,7 +91,8 @@ public class DispatchService
     public async Task<List<Models.Dispatch>> GetDispatchesAsync(string userId)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var company = await db.Companies.FirstAsync(c => c.UserId == userId);
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.UserId == userId);
+        if (company == null) return new();
         return await db.Dispatches.Where(d => d.CompanyId == company.Id).OrderByDescending(d => d.CreatedAt).Take(50).ToListAsync();
     }
 
