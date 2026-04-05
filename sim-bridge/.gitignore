@@ -4,9 +4,10 @@ obj/
 *.user
 *.suo
 
-# Local database
-*.db
-*.db-journal
+# User secrets & env
+appsettings.*.Local.json
+secrets.json
+.env
 
 # Rider / VS Code / VS
 .idea/
