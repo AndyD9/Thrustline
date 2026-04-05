@@ -10,8 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Supabase .NET client : écritures depuis sim-bridge (flights, transactions, capital update) -->
-    <PackageReference Include="supabase-csharp" Version="0.16.2" />
+    <!-- Supabase .NET client : écritures depuis sim-bridge (flights, transactions, capital update).
+         Package moderne "Supabase" (rebrand de l'ancien "supabase-csharp" déprécié à la v0.16.2).
+         Expose les namespaces Supabase.Postgrest.Attributes / Supabase.Postgrest.Models utilisés
+         par nos DTOs dans Cloud/Models/. -->
+    <PackageReference Include="Supabase" Version="1.1.1" />
   </ItemGroup>
 
   <!-- SimConnect SDK (Windows only). The managed wrapper DLL lives in the MSFS SDK.

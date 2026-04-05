@@ -187,7 +187,7 @@ public class LandingProcessor
             // 8. Update capital compagnie
             await client.From<CompanyRow>()
                 .Where(c => c.Id == company.Id)
-                .Set(c => c.Capital!, company.Capital + fin.NetResult)
+                .Set(c => c.Capital, company.Capital + fin.NetResult)
                 .Update(cancellationToken: ct);
 
             // 9. Update aircraft (health/cycles/hours)
