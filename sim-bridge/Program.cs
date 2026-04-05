@@ -1,3 +1,6 @@
+using Thrustline.Bridge.Cloud;
+using Thrustline.Bridge.Services;
+using Thrustline.Bridge.Session;
 using Thrustline.Bridge.SimConnect;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +11,18 @@ builder.Services.AddSingleton(simBridgeConfig);
 
 var supabaseConfig = builder.Configuration.GetSection("Supabase").Get<SupabaseOptions>() ?? new SupabaseOptions();
 builder.Services.AddSingleton(supabaseConfig);
+
+// --- Session (current logged-in user relayed from the React front) ---
+builder.Services.AddSingleton<ISessionStore, SessionStore>();
+
+// --- Supabase client ---
+builder.Services.AddSingleton<ISupabaseClientProvider, SupabaseClientProvider>();
+
+// --- Business services ---
+builder.Services.AddSingleton<YieldService>();
+builder.Services.AddSingleton<CashflowService>();
+builder.Services.AddSingleton<MaintenanceService>();
+builder.Services.AddSingleton<LandingProcessor>();
 
 // --- SimConnect layer ---
 builder.Services.AddSingleton<FlightDetector>();
@@ -41,15 +56,36 @@ var app = builder.Build();
 
 app.UseCors();
 
+// --- Pre-init Supabase if configured (fire-and-forget, errors are logged inside) ---
+_ = app.Services.GetRequiredService<ISupabaseClientProvider>()
+    .EnsureInitializedAsync(CancellationToken.None);
+
 // --- REST endpoints ---
-app.MapGet("/health", () => Results.Ok(new
+app.MapGet("/health", (ISupabaseClientProvider supabase, ISessionStore session) => Results.Ok(new
 {
     status = "ok",
     version = "0.1.0",
     simConnect = simBridgeConfig.UseMockSimConnect ? "mock" : "native",
-    supabaseConfigured = !string.IsNullOrEmpty(supabaseConfig.Url),
+    supabaseConfigured = supabase.IsConfigured,
+    hasSession = session.HasSession,
     time = DateTimeOffset.UtcNow
 }));
+
+// --- Session sync from React ---
+app.MapPost("/session", (SessionPayload payload, ISessionStore session) =>
+{
+    if (payload.UserId == Guid.Empty)
+        return Results.BadRequest(new { error = "userId is required" });
+
+    session.SetUser(payload.UserId);
+    return Results.Ok(new { userId = payload.UserId });
+});
+
+app.MapDelete("/session", (ISessionStore session) =>
+{
+    session.Clear();
+    return Results.NoContent();
+});
 
 // --- SignalR hub ---
 app.MapHub<SimHub>("/hubs/sim");
@@ -76,3 +112,5 @@ public class SupabaseOptions
     /// </summary>
     public string ServiceRoleKey { get; set; } = "";
 }
+
+public record SessionPayload(Guid UserId);
