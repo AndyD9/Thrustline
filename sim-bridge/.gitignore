@@ -1,0 +1,17 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+
+# Local database
+*.db
+*.db-journal
+
+# Rider / VS Code / VS
+.idea/
+.vs/
+.vscode/
+
+# Published output
+publish/
