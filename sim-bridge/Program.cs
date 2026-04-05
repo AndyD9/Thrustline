@@ -1,3 +1,4 @@
+using System.Reflection;
 using Thrustline.Bridge.Cloud;
 using Thrustline.Bridge.Services;
 using Thrustline.Bridge.Session;
@@ -6,6 +7,11 @@ using Thrustline.Bridge.SimConnect;
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Configuration ---
+// Charge user-secrets inconditionnellement (pas seulement en Development) afin que
+// `dotnet user-secrets set "Supabase:Url" ...` marche quelle que soit la façon dont
+// le projet est lancé. optional: true → no-op si l'utilisateur n'a pas fait `init`.
+builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true);
+
 var simBridgeConfig = builder.Configuration.GetSection("SimBridge").Get<SimBridgeOptions>() ?? new SimBridgeOptions();
 builder.Services.AddSingleton(simBridgeConfig);
 
