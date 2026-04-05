@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCompany } from "@/hooks/useCompany";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Layout } from "@/components/Layout";
 import Auth from "@/pages/Auth";
 import Onboarding from "@/pages/Onboarding";

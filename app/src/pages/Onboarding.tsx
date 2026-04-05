@@ -2,9 +2,11 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function Onboarding() {
   const { user } = useAuth();
+  const { refetch } = useCompany();
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
@@ -28,6 +30,10 @@ export default function Onboarding() {
         onboarded: true,
       });
       if (insertError) throw insertError;
+
+      // Rafraîchir le contexte partagé avant de naviguer. Sans ça, App.tsx
+      // voit toujours company === null et renvoie ici en boucle.
+      await refetch();
       navigate("/dashboard", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create airline");

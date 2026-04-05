@@ -1,4 +1,4 @@
-import { useCompany } from "@/hooks/useCompany";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useSim } from "@/contexts/SimContext";
 
 const currency = (n: number) =>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useCompany } from "@/hooks/useCompany";
+import { useCompany } from "@/contexts/CompanyContext";
 import type { Flight } from "@/lib/database.types";
 
 const currency = (n: number) =>
