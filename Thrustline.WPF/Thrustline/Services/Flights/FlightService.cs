@@ -13,7 +13,9 @@ public class FlightService
     public async Task<List<Flight>> GetAllFlightsAsync(string userId, int? limit = null)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var company = await db.Companies.FirstAsync(c => c.UserId == userId);
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.UserId == userId);
+        if (company == null) return new();
+
         var query = db.Flights
             .Include(f => f.Aircraft)
             .Where(f => f.CompanyId == company.Id)

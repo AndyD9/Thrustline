@@ -48,7 +48,8 @@ public class CompanyService
     public async Task<List<Transaction>> GetTransactionsAsync(string userId, int limit = 50)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var company = await db.Companies.FirstAsync(c => c.UserId == userId);
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.UserId == userId);
+        if (company == null) return new();
         return await db.Transactions.Where(t => t.CompanyId == company.Id).OrderByDescending(t => t.CreatedAt).Take(limit).ToListAsync();
     }
 

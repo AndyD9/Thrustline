@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Thrustline.ViewModels;
 
@@ -26,14 +27,27 @@ public partial class NavigationService : ObservableObject, INavigationService
     {
         var vm = (T)_serviceProvider.GetService(typeof(T))!;
         CurrentViewModel = vm;
-        _ = vm.InitializeAsync();
+        InitializeSafe(vm);
         Navigated?.Invoke();
     }
 
     public void NavigateTo(ViewModelBase viewModel)
     {
         CurrentViewModel = viewModel;
-        _ = viewModel.InitializeAsync();
+        InitializeSafe(viewModel);
         Navigated?.Invoke();
+    }
+
+    private static async void InitializeSafe(ViewModelBase vm)
+    {
+        try
+        {
+            await vm.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            vm.ErrorMessage = ex.Message;
+            Debug.WriteLine($"[Nav] InitializeAsync failed for {vm.GetType().Name}: {ex}");
+        }
     }
 }

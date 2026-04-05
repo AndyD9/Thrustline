@@ -15,7 +15,8 @@ public class RouteService
     public async Task<List<DiscoveredRoute>> GetDiscoveredRoutesAsync(string userId)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var company = await db.Companies.FirstAsync(c => c.UserId == userId);
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.UserId == userId);
+        if (company == null) return new();
 
         return await db.Flights
             .Where(f => f.CompanyId == company.Id)
@@ -30,19 +31,20 @@ public class RouteService
     public async Task<List<Route>> GetSavedRoutesAsync(string userId)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var company = await db.Companies.FirstAsync(c => c.UserId == userId);
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.UserId == userId);
+        if (company == null) return new();
         return await db.Routes.Where(r => r.CompanyId == company.Id && r.Active).ToListAsync();
     }
 
     public async Task<Route> CreateRouteAsync(string userId, string originIcao, string destIcao)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var company = await db.Companies.FirstAsync(c => c.UserId == userId);
-        var distance = AirportService.HaversineNm(0, 0, 0, 0); // placeholder — needs airport coords
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.UserId == userId)
+            ?? throw new InvalidOperationException("No company found.");
         var route = new Route
         {
             OriginIcao = originIcao.ToUpperInvariant(), DestIcao = destIcao.ToUpperInvariant(),
-            DistanceNm = distance, BasePrice = 0, CompanyId = company.Id, UserId = userId,
+            DistanceNm = 0, BasePrice = 0, CompanyId = company.Id, UserId = userId,
         };
         db.Routes.Add(route);
         await db.SaveChangesAsync();
@@ -52,7 +54,8 @@ public class RouteService
     public async Task DeleteRouteAsync(string id)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var route = await db.Routes.FirstAsync(r => r.Id == id);
+        var route = await db.Routes.FirstOrDefaultAsync(r => r.Id == id);
+        if (route == null) return;
         route.Active = false;
         await db.SaveChangesAsync();
     }
