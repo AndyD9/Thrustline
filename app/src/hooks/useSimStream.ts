@@ -56,9 +56,11 @@ const initialState: SimStreamState = {
  *   - events : simData, takeoff, landing, connectionChanged
  *   - cleanup à l'unmount
  */
-export function useSimStream(): SimStreamState {
+export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): SimStreamState {
   const [state, setState] = useState<SimStreamState>(initialState);
   const connRef = useRef<HubConnection | null>(null);
+  const onLandingRef = useRef(onLanding);
+  onLandingRef.current = onLanding;
 
   useEffect(() => {
     const conn = new HubConnectionBuilder()
@@ -79,6 +81,7 @@ export function useSimStream(): SimStreamState {
 
     conn.on("landing", (evt: LandingEventPayload) => {
       setState((s) => ({ ...s, lastLanding: evt }));
+      onLandingRef.current?.(evt);
     });
 
     conn.on("connectionChanged", (connected: boolean) => {
