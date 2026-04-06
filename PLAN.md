@@ -128,27 +128,62 @@ Tauri shell (Rust)
 
 ---
 
-## Phase 5 — Game Mechanics (A VENIR)
+## Phase 5 — Game Mechanics (EN COURS)
 
-### 5.1 Evenements aleatoires
-- [ ] `GameEvent` system : fuel_spike, weather, tourism_boom, strike, mechanical
-- [ ] Modificateurs temporaires sur les routes/avions
-- [ ] Notifications in-app
+Ordre d'implementation : 5.3 → 5.2 → 5.4 → 5.1
+(base economique d'abord, puis emprunts, puis reputation, puis evenements)
+
+### 5.3 Salaires & charges mensuelles (PREMIER)
+- [ ] **Timer de session** : a chaque lancement de l'app, calculer le nombre de "mois de jeu" ecoules depuis le dernier calcul
+  - Stocker `last_billing_at` dans `companies` (nouvelle colonne)
+  - Au login, si > 30 jours ecoules → declencher un cycle de facturation
+  - Endpoint sim-bridge `POST /billing/cycle` ou logique frontend-only via Supabase
+- [ ] **Deduction salaires crew** : pour chaque crew_member, deduire `salary_mo` du capital
+  - INSERT transaction (type=salary, amount=-salary_mo, description="Salary — {name}")
+  - UPDATE companies.capital -= total_salaries
+- [ ] **Deduction lease avions** : pour chaque aircraft ownership=leased, deduire `lease_cost_mo`
+  - INSERT transaction (type=lease, amount=-lease_cost_mo, description="Lease — {name}")
+  - UPDATE companies.capital -= total_leases
+- [ ] **UI Finances** : section "Monthly charges" avec breakdown salaires + leases
+- [ ] **Notification** : toast/banner au login montrant le recap des charges deduites
 
 ### 5.2 Systeme de loans
-- [ ] Prendre un emprunt pour acheter un avion
-- [ ] Remboursements mensuels automatiques
-- [ ] UI dans Finances
-
-### 5.3 Salaires & charges mensuelles
-- [ ] Deduction automatique salaires crew
-- [ ] Deduction lease cost avions
-- [ ] Timer mensuel (ou par session)
+- [ ] **Formulaire emprunt** dans Finances : montant, duree (mois), taux d'interet fixe
+  - Table `loans` existe deja : amount, interest_rate, monthly_payment, remaining, active
+  - INSERT loan + UPDATE capital += montant emprunte
+- [ ] **Remboursement mensuel** : dans le cycle de facturation (5.3), deduire `monthly_payment` de chaque loan actif
+  - INSERT transaction (type=loan_payment, amount=-monthly_payment)
+  - UPDATE loans.remaining -= (monthly_payment - interet)
+  - Si remaining <= 0 → UPDATE loans.active = false
+- [ ] **UI Finances** : liste des emprunts actifs, progress bar remboursement, historique
+- [ ] **Validation** : plafond d'emprunt (ex: max 3x le capital actuel), refus si capital < 0
 
 ### 5.4 Reputation avancee
-- [ ] Score par route influence la demande pax
-- [ ] Bonus/malus visibles dans l'UI
-- [ ] Deblocage de routes premium
+- [ ] **Score par route** (table `reputations` existe deja) :
+  - Deja ajuste par qualite d'atterrissage dans LandingProcessor
+  - Ajouter : bonus si vol regulier (>3 vols sur la meme route), malus si route abandonnee (>30 jours sans vol)
+- [ ] **Impact sur la demande pax** : dans YieldService, le `repMult` est deja calcule (0.5 + score/100)
+  - Ajouter : affichage du multiplicateur dans Dispatch (ex: "Demand: 1.2x" a cote de la route)
+  - Couleur verte si >1x, rouge si <1x
+- [ ] **UI reputation** : nouvelle section dans Dashboard ou page dediee
+  - Liste des routes avec score, nombre de vols, tendance (↑↓)
+  - Badge "Premium route" si score > 80
+- [ ] **Routes premium** : routes a haute reputation (>80) generent un bonus +20% de revenue
+  - Modifier YieldService pour ajouter le premium bonus
+
+### 5.1 Evenements aleatoires (DERNIER)
+- [ ] **GameEvent system** : table `game_events` existe deja (type, scope, multiplier, active, expires_at)
+  - Types : fuel_spike (+30% fuel cost), fuel_drop (-20%), weather (annule des vols), tourism_boom (+50% pax revenue sur une route), strike (-100% revenue temporaire), mechanical (-health sur un avion)
+- [ ] **Generateur d'evenements** : a chaque cycle mensuel, 30% de chance de generer 1-2 evenements
+  - Duree : 1-7 jours (expires_at)
+  - Scope : global (toutes routes), route (une route specifique), aircraft (un avion specifique)
+- [ ] **Modificateurs dans les services** :
+  - CashflowService : deja supporte `fuelPriceMultiplier` et `landingFeeMultiplier`
+  - YieldService : ajouter `demandMultiplier` depuis game_events
+- [ ] **UI notifications** : banner en haut du Dashboard avec les evenements actifs
+  - Icone + couleur selon type (rouge=strike, vert=tourism_boom, orange=fuel_spike)
+  - Compte a rebours avant expiration
+- [ ] **UI evenements** : liste dans Settings ou page dediee avec historique
 
 ---
 
