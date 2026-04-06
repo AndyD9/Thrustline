@@ -28,6 +28,7 @@ import {
 } from "recharts";
 import type { Flight, Transaction, Reputation, GameEvent } from "@/lib/database.types";
 import { fetchActiveEvents } from "@/lib/gameEvents";
+import { gradeToScore, gradeColors } from "@/lib/landingGrade";
 import FlightMap, { type RouteArc } from "@/components/FlightMap";
 import { airportByIcao } from "@/data/airports";
 
@@ -289,6 +290,56 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Landing Progression */}
+      {(() => {
+        const gradeData = [...recentFlights]
+          .reverse()
+          .filter((f) => f.landing_grade)
+          .slice(-15)
+          .map((f) => ({
+            name: `${f.departure_icao}-${f.arrival_icao}`,
+            score: gradeToScore(f.landing_grade!),
+            grade: f.landing_grade!,
+            pax: f.pax_satisfaction != null ? Math.round(f.pax_satisfaction) : null,
+          }));
+        return gradeData.length > 1 ? (
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+            <div className="mb-4 text-[10px] uppercase tracking-[0.15em] text-slate-500">
+              Landing progression
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart data={gradeData}>
+                <defs>
+                  <linearGradient id="gradGrade" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34d399" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 10 }} ticks={[2, 4, 6, 8, 10]} />
+                <Tooltip
+                  contentStyle={{
+                    background: "rgba(10, 16, 24, 0.95)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: "0.75rem",
+                    fontSize: 12,
+                  }}
+                  formatter={(value: number, name: string) => {
+                    if (name === "score") {
+                      const labels: Record<number, string> = { 10: "A+", 9: "A", 8: "B+", 7: "B", 6: "C+", 5: "C", 4: "D", 3: "D-", 2: "F+", 1: "F" };
+                      return [labels[value] ?? value, "Grade"];
+                    }
+                    return [value + "%", "Pax"];
+                  }}
+                />
+                <Area type="monotone" dataKey="score" stroke="#34d399" strokeWidth={2} fill="url(#gradGrade)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        ) : null;
+      })()}
 
       {/* Route Reputation */}
       {reputations.length > 0 && (

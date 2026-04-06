@@ -11,6 +11,9 @@ import {
   Settings,
   LogOut,
   Map,
+  TrendingUp,
+  Trophy,
+  BookOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -22,13 +25,16 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/flights",   label: "Flights",   icon: Plane },
-  { to: "/dispatch",  label: "Dispatch",  icon: ClipboardList },
-  { to: "/fleet",     label: "Fleet",     icon: Warehouse },
-  { to: "/crew",      label: "Crew",      icon: Users },
-  { to: "/finances",  label: "Finances",  icon: DollarSign },
-  { to: "/settings",  label: "Settings",  icon: Settings },
+  { to: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
+  { to: "/flights",      label: "Flights",      icon: Plane },
+  { to: "/dispatch",     label: "Dispatch",     icon: ClipboardList },
+  { to: "/fleet",        label: "Fleet",        icon: Warehouse },
+  { to: "/crew",         label: "Crew",         icon: Users },
+  { to: "/routes",       label: "Routes",       icon: TrendingUp },
+  { to: "/achievements", label: "Achievements", icon: Trophy },
+  { to: "/efb",          label: "EFB",          icon: BookOpen },
+  { to: "/finances",     label: "Finances",     icon: DollarSign },
+  { to: "/settings",     label: "Settings",     icon: Settings },
 ];
 
 export function Sidebar() {

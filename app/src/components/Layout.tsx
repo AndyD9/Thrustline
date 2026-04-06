@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { SimStatusBadge } from "./SimStatusBadge";
 import { LiveFlightBar } from "./LiveFlightBar";
+import { AchievementToast } from "./AchievementToast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { X, Receipt } from "lucide-react";
 
@@ -10,6 +11,7 @@ export function Layout() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-surface-0">
+      <AchievementToast />
       <Sidebar />
 
       <div className="flex flex-1 flex-col overflow-hidden">

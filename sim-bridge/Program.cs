@@ -28,6 +28,11 @@ builder.Services.AddSingleton<ISupabaseClientProvider, SupabaseClientProvider>()
 builder.Services.AddSingleton<YieldService>();
 builder.Services.AddSingleton<CashflowService>();
 builder.Services.AddSingleton<MaintenanceService>();
+builder.Services.AddSingleton<LandingGradeService>();
+builder.Services.AddSingleton<FuelValidationService>();
+builder.Services.AddSingleton<PaxSatisfactionService>();
+builder.Services.AddSingleton<AcarsService>();
+builder.Services.AddSingleton<AchievementService>();
 builder.Services.AddSingleton<LandingProcessor>();
 
 // --- SimConnect layer ---

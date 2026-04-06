@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.SignalR;
+using Thrustline.Bridge.Cloud;
+using Thrustline.Bridge.Cloud.Models;
 using Thrustline.Bridge.Services;
+using Thrustline.Bridge.Session;
 
 namespace Thrustline.Bridge.SimConnect;
 
@@ -15,6 +18,7 @@ public class SimConnectWorker : BackgroundService
 {
     private readonly ISimClient _client;
     private readonly FlightDetector _detector;
+    private readonly AcarsService _acars;
     private readonly IHubContext<SimHub> _hub;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<SimConnectWorker> _log;
@@ -22,12 +26,14 @@ public class SimConnectWorker : BackgroundService
     public SimConnectWorker(
         ISimClient client,
         FlightDetector detector,
+        AcarsService acars,
         IHubContext<SimHub> hub,
         IServiceScopeFactory scopeFactory,
         ILogger<SimConnectWorker> log)
     {
         _client = client;
         _detector = detector;
+        _acars = acars;
         _hub = hub;
         _scopeFactory = scopeFactory;
         _log = log;
@@ -39,7 +45,43 @@ public class SimConnectWorker : BackgroundService
         _client.ConnectionChanged += OnConnectionChanged;
 
         _detector.Takeoff += (_, data) =>
+        {
             _ = _hub.Clients.All.SendAsync("takeoff", data, stoppingToken);
+
+            // Start ACARS tracking for the active dispatch
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var supabase = scope.ServiceProvider.GetRequiredService<ISupabaseClientProvider>();
+                    var session = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+                    if (!supabase.IsConfigured || session.CurrentUserId is null) return;
+
+                    await supabase.EnsureInitializedAsync(stoppingToken);
+                    var client = supabase.Client;
+
+                    var company = (await client.From<CompanyRow>()
+                        .Where(c => c.UserId == session.CurrentUserId.Value)
+                        .Single(stoppingToken));
+                    if (company is null) return;
+
+                    var dispatchResp = await client.From<DispatchRow>()
+                        .Where(d => d.CompanyId == company.Id)
+                        .Where(d => d.Status == DispatchRow.StatusFlying)
+                        .Limit(1)
+                        .Get(stoppingToken);
+                    var dispatch = dispatchResp.Models.FirstOrDefault();
+                    if (dispatch is null) return;
+
+                    _acars.StartFlight(dispatch.Id, company.Id);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError(ex, "Failed to start ACARS on takeoff");
+                }
+            }, stoppingToken);
+        };
 
         _detector.Landing += async (_, evt) =>
         {
@@ -81,6 +123,7 @@ public class SimConnectWorker : BackgroundService
     private void OnData(object? sender, SimData data)
     {
         _detector.Ingest(data);
+        _acars.Ingest(data);
         _ = _hub.Clients.All.SendAsync("simData", data);
     }
 

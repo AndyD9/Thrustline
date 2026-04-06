@@ -7,6 +7,8 @@ import { airportByIcao } from "@/data/airports";
 import FlightMap from "@/components/FlightMap";
 import type { Dispatch } from "@/lib/database.types";
 import type { Airport } from "@/data/airports";
+import type { AcarsUpdatePayload } from "@/hooks/useSimStream";
+import { computeGrade } from "@/lib/landingGrade";
 import {
   ArrowLeft,
   Plane,
@@ -19,6 +21,11 @@ import {
   Clock,
   Route as RouteIcon,
   CheckCircle2,
+  Radio,
+  ChevronDown,
+  ChevronUp,
+  Users,
+  Target,
 } from "lucide-react";
 
 export default function LiveFlight() {
@@ -26,7 +33,7 @@ export default function LiveFlight() {
   const [params] = useSearchParams();
   const dispatchId = params.get("dispatch");
 
-  const { latest, simActive, lastLanding } = useSim();
+  const { latest, simActive, lastLanding, acarsLog, currentPhase } = useSim();
   const { fmt } = useUnits();
 
   const [dispatch, setDispatch] = useState<Dispatch | null>(null);
@@ -34,6 +41,8 @@ export default function LiveFlight() {
   const [destination, setDestination] = useState<Airport | undefined>();
   const [waypoints, setWaypoints] = useState<[number, number][]>([]);
   const [landed, setLanded] = useState(false);
+  const [acarsOpen, setAcarsOpen] = useState(true);
+  const acarsEndRef = useRef<HTMLDivElement>(null);
 
   // Track aircraft trail
   const trailRef = useRef<[number, number][]>([]);
@@ -90,6 +99,11 @@ export default function LiveFlight() {
   useEffect(() => {
     if (lastLanding) setLanded(true);
   }, [lastLanding]);
+
+  // Auto-scroll ACARS log
+  useEffect(() => {
+    acarsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [acarsLog.length]);
 
   const goBack = useCallback(() => navigate("/dispatch"), [navigate]);
 
@@ -179,36 +193,44 @@ export default function LiveFlight() {
         </div>
       )}
 
-      {/* Landing overlay */}
-      {landed && lastLanding && (
-        <div className="absolute inset-x-0 bottom-8 z-10 flex justify-center">
-          <div className="rounded-2xl border border-emerald-500/20 bg-[#0a0f18]/95 px-8 py-5 backdrop-blur-md glow-brand-sm animate-slide-up">
-            <div className="mb-3 flex items-center gap-2 text-emerald-400">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-semibold">Flight Complete</span>
-            </div>
-            <div className="grid grid-cols-3 gap-6 text-center">
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500">Distance</div>
-                <div className="font-mono text-lg font-bold text-white">{fmt.distance(lastLanding.distanceNm)}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500">Landing VS</div>
-                <div className="font-mono text-lg font-bold text-white">{fmt.vs(Math.abs(lastLanding.landingVsFpm))}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500">Duration</div>
-                <div className="font-mono text-lg font-bold text-white">{lastLanding.durationMin} min</div>
-              </div>
-            </div>
+      {/* ACARS panel — left, below flight info */}
+      {dispatch && !landed && acarsLog.length > 0 && (
+        <div className="absolute left-4 bottom-8 z-10 w-72">
+          <div className="rounded-xl border border-white/[0.08] bg-[#0a0f18]/90 backdrop-blur-md">
             <button
-              onClick={goBack}
-              className="mt-4 w-full rounded-xl bg-brand-500 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400"
+              onClick={() => setAcarsOpen(!acarsOpen)}
+              className="flex w-full items-center justify-between px-4 py-2.5"
             >
-              Back to Dispatch
+              <div className="flex items-center gap-2">
+                <Radio className="h-3.5 w-3.5 text-brand-400" />
+                <span className="text-[10px] uppercase tracking-[0.15em] text-slate-400">ACARS</span>
+                {currentPhase && (
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${phaseStyle(currentPhase)}`}>
+                    {currentPhase.replace("_", " ")}
+                  </span>
+                )}
+              </div>
+              {acarsOpen ? <ChevronDown className="h-3.5 w-3.5 text-slate-500" /> : <ChevronUp className="h-3.5 w-3.5 text-slate-500" />}
             </button>
+            {acarsOpen && (
+              <div className="max-h-48 overflow-y-auto border-t border-white/[0.06] px-3 py-2 text-[11px]">
+                {acarsLog.slice(-20).map((r, i) => (
+                  <AcarsRow key={i} report={r} fmtAlt={fmt.altitude} />
+                ))}
+                <div ref={acarsEndRef} />
+              </div>
+            )}
           </div>
         </div>
+      )}
+
+      {/* Landing overlay */}
+      {landed && lastLanding && (
+        <LandingOverlay
+          lastLanding={lastLanding}
+          fmt={fmt}
+          goBack={goBack}
+        />
       )}
     </div>
   );
@@ -253,4 +275,89 @@ function InstrumentRow({ icon: Icon, label, value }: { icon: typeof Plane; label
       <span className="ml-auto font-mono text-sm font-medium text-slate-100">{value}</span>
     </div>
   );
+}
+
+function LandingOverlay({
+  lastLanding,
+  fmt,
+  goBack,
+}: {
+  lastLanding: { distanceNm: number; landingVsFpm: number; durationMin: number };
+  fmt: { distance: (v: number) => string; vs: (v: number) => string };
+  goBack: () => void;
+}) {
+  const grade = computeGrade(lastLanding.landingVsFpm);
+
+  return (
+    <div className="absolute inset-x-0 bottom-8 z-10 flex justify-center">
+      <div className="rounded-2xl border border-emerald-500/20 bg-[#0a0f18]/95 px-8 py-5 backdrop-blur-md glow-brand-sm animate-slide-up">
+        <div className="mb-3 flex items-center gap-2 text-emerald-400">
+          <CheckCircle2 className="h-5 w-5" />
+          <span className="font-semibold">Flight Complete</span>
+        </div>
+        <div className="grid grid-cols-5 gap-5 text-center">
+          {/* Landing Grade — prominent */}
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">Grade</div>
+            <div className={`font-mono text-3xl font-black ${grade.color}`}>{grade.grade}</div>
+            <div className={`text-[10px] ${grade.color}`}>{grade.label}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">Landing VS</div>
+            <div className="font-mono text-lg font-bold text-white">{fmt.vs(Math.abs(lastLanding.landingVsFpm))}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">Distance</div>
+            <div className="font-mono text-lg font-bold text-white">{fmt.distance(lastLanding.distanceNm)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">Duration</div>
+            <div className="font-mono text-lg font-bold text-white">{lastLanding.durationMin} min</div>
+          </div>
+          <div>
+            <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wider text-slate-500">
+              <Users className="h-3 w-3" /> Pax
+            </div>
+            <div className="font-mono text-lg font-bold text-white">--</div>
+            <div className="text-[10px] text-slate-500">After sync</div>
+          </div>
+        </div>
+        <button
+          onClick={goBack}
+          className="mt-4 w-full rounded-xl bg-brand-500 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400"
+        >
+          Back to Dispatch
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AcarsRow({ report, fmtAlt }: { report: AcarsUpdatePayload; fmtAlt: (v: number) => string }) {
+  const time = new Date(report.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return (
+    <div className="flex items-center gap-2 py-0.5 text-slate-400">
+      <span className="w-14 shrink-0 font-mono text-slate-500">{time}</span>
+      <span className={`w-16 shrink-0 rounded px-1 py-0.5 text-center text-[9px] font-bold uppercase ${phaseStyle(report.phase)}`}>
+        {report.phase.replace("_", " ")}
+      </span>
+      <span className="font-mono text-slate-300">{fmtAlt(report.altitudeFt)}</span>
+      <span className="font-mono text-slate-500">{Math.round(report.groundSpeedKts)}kts</span>
+    </div>
+  );
+}
+
+function phaseStyle(phase: string): string {
+  switch (phase) {
+    case "preflight": return "bg-slate-500/20 text-slate-400";
+    case "taxi_out":
+    case "taxi_in": return "bg-amber-500/20 text-amber-400";
+    case "takeoff": return "bg-brand-500/20 text-brand-400";
+    case "climb": return "bg-blue-500/20 text-blue-400";
+    case "cruise": return "bg-emerald-500/20 text-emerald-400";
+    case "descent": return "bg-purple-500/20 text-purple-400";
+    case "approach": return "bg-orange-500/20 text-orange-400";
+    case "landing": return "bg-emerald-500/20 text-emerald-400";
+    default: return "bg-slate-500/20 text-slate-400";
+  }
 }

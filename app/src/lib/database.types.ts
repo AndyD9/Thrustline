@@ -160,10 +160,45 @@ export interface Flight {
   fuel_cost: number;
   landing_fee: number;
   net_result: number;
+  landing_grade: string | null;
+  planned_fuel_gal: number | null;
+  fuel_accuracy_pct: number | null;
+  pax_satisfaction: number | null;
   started_at: string;
   completed_at: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface AcarsReport {
+  id: string;
+  user_id: string;
+  company_id: string;
+  flight_id: string | null;
+  dispatch_id: string;
+  phase: string;
+  latitude: number;
+  longitude: number;
+  altitude_ft: number;
+  ground_speed_kts: number;
+  heading_deg: number;
+  vs_fpm: number;
+  fuel_gal: number;
+  message: string;
+  created_at: string;
+}
+
+export interface Achievement {
+  id: string;
+  user_id: string;
+  company_id: string;
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlocked_at: string;
+  flight_id: string | null;
+  created_at: string;
 }
 
 export interface Loan {
@@ -227,7 +262,9 @@ export interface Database {
       flights:      { Row: Row<Flight>;      Insert: Insert<Flight>;      Update: Update<Flight> };
       loans:        { Row: Row<Loan>;        Insert: Insert<Loan>;        Update: Update<Loan> };
       game_events:  { Row: Row<GameEvent>;   Insert: Insert<GameEvent>;   Update: Update<GameEvent> };
-      transactions: { Row: Row<Transaction>; Insert: Insert<Transaction>; Update: Update<Transaction> };
+      transactions:  { Row: Row<Transaction>;  Insert: Insert<Transaction>;  Update: Update<Transaction> };
+      acars_reports: { Row: Row<AcarsReport>;  Insert: Insert<AcarsReport>;  Update: Update<AcarsReport> };
+      achievements:  { Row: Row<Achievement>;  Insert: Insert<Achievement>;  Update: Update<Achievement> };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

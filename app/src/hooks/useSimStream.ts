@@ -30,6 +30,25 @@ export interface LandingEventPayload {
   landingVsFpm: number;
 }
 
+export interface AcarsUpdatePayload {
+  phase: string;
+  latitude: number;
+  longitude: number;
+  altitudeFt: number;
+  groundSpeedKts: number;
+  headingDeg: number;
+  fuelGal: number;
+  message: string;
+  timestamp: string;
+}
+
+export interface AchievementPayload {
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+}
+
 export interface SimStreamState {
   /** sim-bridge service reachable via SignalR */
   connected: boolean;
@@ -38,6 +57,12 @@ export interface SimStreamState {
   latest: SimData | null;
   lastTakeoff: SimData | null;
   lastLanding: LandingEventPayload | null;
+  /** ACARS position reports accumulated during flight */
+  acarsLog: AcarsUpdatePayload[];
+  /** Current flight phase from ACARS service */
+  currentPhase: string | null;
+  /** Latest unlocked achievement (for toast display) */
+  latestAchievement: AchievementPayload | null;
 }
 
 const initialState: SimStreamState = {
@@ -46,6 +71,9 @@ const initialState: SimStreamState = {
   latest: null,
   lastTakeoff: null,
   lastLanding: null,
+  acarsLog: [],
+  currentPhase: null,
+  latestAchievement: null,
 };
 
 /**
@@ -76,12 +104,24 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
     });
 
     conn.on("takeoff", (data: SimData) => {
-      setState((s) => ({ ...s, lastTakeoff: data, lastLanding: null }));
+      setState((s) => ({ ...s, lastTakeoff: data, lastLanding: null, acarsLog: [], currentPhase: "takeoff" }));
     });
 
     conn.on("landing", (evt: LandingEventPayload) => {
       setState((s) => ({ ...s, lastLanding: evt }));
       onLandingRef.current?.(evt);
+    });
+
+    conn.on("acarsUpdate", (report: AcarsUpdatePayload) => {
+      setState((s) => ({ ...s, acarsLog: [...s.acarsLog.slice(-499), report] }));
+    });
+
+    conn.on("phaseChange", (phase: string) => {
+      setState((s) => ({ ...s, currentPhase: phase }));
+    });
+
+    conn.on("achievementUnlocked", (achievement: AchievementPayload) => {
+      setState((s) => ({ ...s, latestAchievement: achievement }));
     });
 
     conn.on("connectionChanged", (connected: boolean) => {

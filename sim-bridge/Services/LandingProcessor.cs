@@ -30,6 +30,11 @@ public class LandingProcessor
     private readonly YieldService _yield;
     private readonly CashflowService _cashflow;
     private readonly MaintenanceService _maintenance;
+    private readonly LandingGradeService _grade;
+    private readonly FuelValidationService _fuelValidation;
+    private readonly PaxSatisfactionService _paxSatisfaction;
+    private readonly AcarsService _acars;
+    private readonly AchievementService _achievements;
     private readonly ILogger<LandingProcessor> _log;
 
     public LandingProcessor(
@@ -38,6 +43,11 @@ public class LandingProcessor
         YieldService yield,
         CashflowService cashflow,
         MaintenanceService maintenance,
+        LandingGradeService grade,
+        FuelValidationService fuelValidation,
+        PaxSatisfactionService paxSatisfaction,
+        AcarsService acars,
+        AchievementService achievements,
         ILogger<LandingProcessor> log)
     {
         _supabase = supabase;
@@ -45,6 +55,11 @@ public class LandingProcessor
         _yield = yield;
         _cashflow = cashflow;
         _maintenance = maintenance;
+        _grade = grade;
+        _fuelValidation = fuelValidation;
+        _paxSatisfaction = paxSatisfaction;
+        _acars = acars;
+        _achievements = achievements;
         _log = log;
     }
 
@@ -117,6 +132,11 @@ public class LandingProcessor
             var revenue = _yield.Compute(dispatch.PaxEco, dispatch.PaxBiz, distanceNm, repScore);
             var fin = _cashflow.Compute(revenue, fuelUsedGal);
 
+            // Landing grade, fuel validation, pax satisfaction
+            var gradeResult = _grade.Compute(landingVsFpm);
+            var fuelResult = _fuelValidation.Compute(fuelUsedGal, dispatch);
+            var paxSat = _paxSatisfaction.Compute(landingVsFpm, evt.DurationMin, dispatch);
+
             MaintenanceUpdate? maint = null;
             if (aircraft is not null)
             {
@@ -145,6 +165,10 @@ public class LandingProcessor
                 FuelCost = fin.FuelCost,
                 LandingFee = fin.LandingFee,
                 NetResult = fin.NetResult,
+                LandingGrade = gradeResult.Grade,
+                PlannedFuelGal = fuelResult.PlannedFuelGal,
+                FuelAccuracyPct = fuelResult.FuelAccuracyPct,
+                PaxSatisfaction = paxSat,
                 StartedAt = evt.Takeoff.Timestamp.UtcDateTime,
                 CompletedAt = evt.Touchdown.Timestamp.UtcDateTime,
             };
@@ -201,8 +225,8 @@ public class LandingProcessor
                     .Update(cancellationToken: ct);
             }
 
-            // 10. Upsert reputation
-            var repAdjustment = ComputeReputationAdjustment(landingVsFpm);
+            // 10. Upsert reputation (enriched with pax satisfaction)
+            var repAdjustment = ComputeReputationAdjustment(landingVsFpm, paxSat);
             if (reputation is null)
             {
                 await client.From<ReputationRow>().Insert(new ReputationRow
@@ -231,10 +255,17 @@ public class LandingProcessor
                 .Set(d => d.Status, DispatchRow.StatusCompleted)
                 .Update(cancellationToken: ct);
 
+            // 12. Link ACARS reports to this flight
+            await _acars.LinkReportsToFlight(dispatch.Id, insertedFlight.Id, ct);
+            _acars.EndFlight();
+
+            // 13. Check achievements
+            await _achievements.CheckAndAwardAsync(insertedFlight, company, userId.Value, ct);
+
             _log.LogInformation(
-                "✅ Landing persisted: flight {Flight} {From}→{To} revenue={Rev:C} fuel={Fuel:C} landingFee={Fee:C} net={Net:C}",
+                "✅ Landing persisted: flight {Flight} {From}→{To} grade={Grade} revenue={Rev:C} fuel={Fuel:C} net={Net:C} paxSat={Pax:F0}",
                 insertedFlight.Id, dispatch.OriginIcao, dispatch.DestIcao,
-                fin.Revenue, fin.FuelCost, fin.LandingFee, fin.NetResult);
+                gradeResult.Grade, fin.Revenue, fin.FuelCost, fin.NetResult, paxSat);
         }
         catch (Exception ex)
         {
@@ -243,13 +274,13 @@ public class LandingProcessor
     }
 
     /// <summary>
-    /// Ajuste la réputation selon la qualité de l'atterrissage (vs en fpm).
-    /// Soft landing = bonus, hard landing = malus.
+    /// Ajuste la réputation selon la qualité de l'atterrissage (vs en fpm)
+    /// et la satisfaction passagers.
     /// </summary>
-    private static decimal ComputeReputationAdjustment(decimal landingVsFpm)
+    private static decimal ComputeReputationAdjustment(decimal landingVsFpm, decimal paxSatisfaction)
     {
         var absVs = Math.Abs(landingVsFpm);
-        return absVs switch
+        var baseAdj = absVs switch
         {
             < 150m  =>  1.0m,   // greaser
             < 300m  =>  0.5m,   // nice touchdown
@@ -257,5 +288,16 @@ public class LandingProcessor
             < 1000m => -1.0m,   // hard
             _       => -3.0m,   // very hard, pax not happy
         };
+
+        // Pax satisfaction bonus/penalty
+        var paxAdj = paxSatisfaction switch
+        {
+            > 90m => 0.5m,
+            > 80m => 0.3m,
+            < 40m => -0.5m,
+            _     => 0.0m,
+        };
+
+        return baseAdj + paxAdj;
     }
 }

@@ -57,6 +57,18 @@ public class FlightRow : BaseModel
     [Column("completed_at")]
     public DateTime CompletedAt { get; set; }
 
+    [Column("landing_grade")]
+    public string? LandingGrade { get; set; }
+
+    [Column("planned_fuel_gal")]
+    public decimal? PlannedFuelGal { get; set; }
+
+    [Column("fuel_accuracy_pct")]
+    public decimal? FuelAccuracyPct { get; set; }
+
+    [Column("pax_satisfaction")]
+    public decimal? PaxSatisfaction { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 

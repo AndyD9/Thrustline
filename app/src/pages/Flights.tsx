@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Plane, Clock, Fuel, Route } from "lucide-react";
+import { Plane, Clock, Fuel, Route, Users } from "lucide-react";
 import type { Flight } from "@/lib/database.types";
+import { gradeColors } from "@/lib/landingGrade";
 
 const currency = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -84,6 +85,26 @@ export default function Flights() {
                   <span>{f.duration_min} min</span>
                   <span>{Number(f.fuel_used_gal).toFixed(0)} gal</span>
                 </div>
+
+                {/* Grade badge */}
+                {f.landing_grade && (() => {
+                  const gc = gradeColors(f.landing_grade);
+                  return (
+                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${gc.bgColor} ${gc.color}`}>
+                      {f.landing_grade}
+                    </span>
+                  );
+                })()}
+
+                {/* Pax satisfaction */}
+                {f.pax_satisfaction != null && (
+                  <span className="flex items-center gap-1 text-xs text-slate-500">
+                    <Users className="h-3 w-3" />
+                    <span className={`font-mono font-semibold ${
+                      f.pax_satisfaction >= 80 ? "text-emerald-400" : f.pax_satisfaction >= 50 ? "text-amber-400" : "text-red-400"
+                    }`}>{Math.round(f.pax_satisfaction)}%</span>
+                  </span>
+                )}
               </div>
 
               {/* Financials + date */}
