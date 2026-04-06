@@ -19,10 +19,12 @@ const LAST_NAMES = [
   "Johansson", "Larsen", "Petrov", "Kowalski", "Novak", "Fernandez", "Lopez",
 ];
 
+export type CrewCandidateRank = "captain" | "first_officer" | "cabin_crew";
+
 export interface CrewCandidate {
   firstName: string;
   lastName: string;
-  rank: "captain" | "first_officer";
+  rank: CrewCandidateRank;
   experience: number;
   salaryMo: number;
 }
@@ -36,16 +38,16 @@ function pick<T>(arr: T[]): T {
 }
 
 /** Generate a realistic monthly salary based on rank and experience. */
-export function generateSalary(rank: "captain" | "first_officer", experience: number): number {
-  const base = rank === "captain" ? 12000 : 7000;
+export function generateSalary(rank: CrewCandidateRank, experience: number): number {
+  const base = rank === "captain" ? 12000 : rank === "first_officer" ? 7000 : 3500;
   const expBonus = base * experience * 0.02;
   const marketVar = base * (Math.random() * 0.2 - 0.1);
   return Math.round(base + expBonus + marketVar);
 }
 
 /** Generate a single crew candidate. */
-export function generateCandidate(rank: "captain" | "first_officer"): CrewCandidate {
-  const experience = rank === "captain" ? randInt(3, 25) : randInt(0, 15);
+export function generateCandidate(rank: CrewCandidateRank): CrewCandidate {
+  const experience = rank === "captain" ? randInt(3, 25) : rank === "first_officer" ? randInt(0, 15) : randInt(0, 20);
   return {
     firstName: pick(FIRST_NAMES),
     lastName: pick(LAST_NAMES),
@@ -57,7 +59,7 @@ export function generateCandidate(rank: "captain" | "first_officer"): CrewCandid
 
 /** Generate a pool of candidates for hiring. */
 export function generateCandidates(
-  rank: "captain" | "first_officer",
+  rank: CrewCandidateRank,
   count = 4,
 ): CrewCandidate[] {
   const candidates: CrewCandidate[] = [];
@@ -73,10 +75,14 @@ export function generateCandidates(
   return candidates.sort((a, b) => a.salaryMo - b.salaryMo);
 }
 
-/** Generate a crew pair (captain + FO) for a new aircraft. */
-export function generateCrewForAircraft(): { captain: CrewCandidate; firstOfficer: CrewCandidate } {
-  return {
-    captain: generateCandidate("captain"),
-    firstOfficer: generateCandidate("first_officer"),
-  };
+/** Generate a full crew for an aircraft type. */
+export function generateCrewForAircraft(minPilots: number, minCabin: number): CrewCandidate[] {
+  const crew: CrewCandidate[] = [];
+  // Always 1 captain
+  crew.push(generateCandidate("captain"));
+  // Remaining pilots as FOs
+  for (let i = 1; i < minPilots; i++) crew.push(generateCandidate("first_officer"));
+  // Cabin crew
+  for (let i = 0; i < minCabin; i++) crew.push(generateCandidate("cabin_crew"));
+  return crew;
 }

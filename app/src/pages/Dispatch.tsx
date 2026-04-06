@@ -430,6 +430,7 @@ function NewDispatchForm({
             <Pill label="Fuel Cap" value={fmt.fuel(acType.fuelCapacityGal)} />
             <Pill label="Cruise" value={fmt.speed(acType.cruiseSpeedKts)} />
             <Pill label="Ceiling" value={fmt.altitude(acType.ceilingFt)} />
+            <Pill label="Min Crew" value={`${acType.minPilots} pilots + ${acType.minCabin} cabin`} />
           </div>
         )}
       </div>

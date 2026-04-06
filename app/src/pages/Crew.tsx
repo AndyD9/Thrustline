@@ -14,6 +14,7 @@ const statusConfig: Record<CrewStatus, { bg: string; text: string; dot: string }
 const rankLabels: Record<CrewRank, string> = {
   captain: "CPT",
   first_officer: "FO",
+  cabin_crew: "CC",
 };
 
 const currency = (n: number) =>
@@ -254,7 +255,7 @@ function HireCrewForm({
         <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Find candidates</h2>
         <div className="flex items-center gap-2">
           {/* Rank toggle */}
-          {(["captain", "first_officer"] as CrewRank[]).map((r) => (
+          {(["captain", "first_officer", "cabin_crew"] as CrewRank[]).map((r) => (
             <button
               key={r}
               type="button"
@@ -265,7 +266,7 @@ function HireCrewForm({
                   : "text-slate-500 hover:text-slate-300"
               }`}
             >
-              {r === "captain" ? "Captain" : "First Officer"}
+              {r === "captain" ? "Captain" : r === "first_officer" ? "First Officer" : "Cabin Crew"}
             </button>
           ))}
           <button

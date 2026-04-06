@@ -28,7 +28,7 @@ export type DispatchStatus =
   | "flying"
   | "completed"
   | "cancelled";
-export type CrewRank = "captain" | "first_officer";
+export type CrewRank = "captain" | "first_officer" | "cabin_crew";
 export type CrewStatus = "available" | "flying" | "resting";
 export type GameEventType =
   | "fuel_spike"
