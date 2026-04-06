@@ -5,6 +5,18 @@ import { Plane, Wrench, Clock, Hash, Plus, X, ChevronRight, Download, Loader2 } 
 import type { Aircraft } from "@/lib/database.types";
 import AircraftTypePicker from "@/components/AircraftTypePicker";
 import { fetchSimbriefAircraft } from "@/lib/simbrief";
+import { Info } from "lucide-react";
+
+/** Generate realistic aircraft pricing based on MTOW.
+ *  Purchase: ~$350-450/kg MTOW with ±10% market variance.
+ *  Lease: ~1.0-1.4% of purchase price per month. */
+function generatePricing(mtowKg: number): { purchase: number; leaseMo: number } {
+  const pricePerKg = 350 + Math.random() * 100; // $350-450/kg
+  const purchase = Math.round(mtowKg * pricePerKg / 100000) * 100000; // round to 100k
+  const leaseRate = 0.010 + Math.random() * 0.004; // 1.0-1.4%/mo
+  const leaseMo = Math.round(purchase * leaseRate / 1000) * 1000; // round to 1k
+  return { purchase, leaseMo };
+}
 
 const pct = (n: number) => `${n.toFixed(1)}%`;
 const currency = (n: number) =>
@@ -209,11 +221,17 @@ function AddAircraftForm({
     setError(null);
     const ac = await fetchSimbriefAircraft(simbriefUsername, simbriefAircraftId);
     setFetching(false);
-    if (!ac) { setError("Could not fetch aircraft from SimBrief. Generate an OFP with this aircraft first."); return; }
+    if (!ac) { setError("Could not fetch aircraft. You need to generate at least one OFP with this aircraft on SimBrief first."); return; }
     // Auto-fill fields
     if (ac.icaoType) setIcaoType(ac.icaoType);
     if (ac.registration) setRegistration(ac.registration);
     if (ac.name) setName(ac.name);
+    // Auto-generate pricing from MTOW
+    if (ac.maxTakeoffKg > 0) {
+      const pricing = generatePricing(ac.maxTakeoffKg);
+      setLeaseCost(String(pricing.leaseMo));
+      setPurchasePrice(String(pricing.purchase));
+    }
     setFetchedSpecs({
       maxPax: ac.maxPax,
       maxCargoKg: ac.maxCargoKg,
@@ -269,6 +287,17 @@ function AddAircraftForm({
             {fetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             {fetching ? "Fetching..." : "Fetch from SimBrief"}
           </button>
+        </div>
+      )}
+
+      {/* Info note */}
+      {simbriefUsername && !fetchedSpecs && (
+        <div className="flex items-start gap-2 rounded-lg border border-blue-500/10 bg-blue-500/[0.03] px-3 py-2 text-[11px] text-blue-300/70">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Paste the Internal ID from your SimBrief saved aircraft page (visible at the top: "Internal ID: xxx").
+            You must have generated at least one OFP with this aircraft on SimBrief for the fetch to work.
+          </span>
         </div>
       )}
 
