@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Plane, Wrench, Clock, Hash, Plus, X, ChevronRight } from "lucide-react";
+import { Plane, Wrench, Clock, Hash, Plus, X, ChevronRight, Download, Loader2 } from "lucide-react";
 import type { Aircraft } from "@/lib/database.types";
 import AircraftTypePicker from "@/components/AircraftTypePicker";
+import { fetchSimbriefAircraft } from "@/lib/simbrief";
 
 const pct = (n: number) => `${n.toFixed(1)}%`;
 const currency = (n: number) =>
@@ -62,6 +63,7 @@ export default function Fleet() {
         <AddAircraftForm
           companyId={company.id}
           userId={company.user_id}
+          simbriefUsername={company.simbrief_username ?? ""}
           onDone={() => {
             setShowForm(false);
             void fetchFleet();
@@ -178,10 +180,12 @@ export default function Fleet() {
 function AddAircraftForm({
   companyId,
   userId,
+  simbriefUsername,
   onDone,
 }: {
   companyId: string;
   userId: string;
+  simbriefUsername: string;
   onDone: () => void;
 }) {
   const [name, setName] = useState("");
@@ -193,6 +197,32 @@ function AddAircraftForm({
   const [purchasePrice, setPurchasePrice] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [fetchedSpecs, setFetchedSpecs] = useState<{
+    maxPax: number; maxCargoKg: number; maxFuelKg: number;
+    emptyWeightKg: number; maxTakeoffKg: number; engineType: string;
+  } | null>(null);
+
+  const doFetchSimbrief = async () => {
+    if (!simbriefUsername) { setError("Set your SimBrief username in Settings first"); return; }
+    setFetching(true);
+    setError(null);
+    const ac = await fetchSimbriefAircraft(simbriefUsername, simbriefAircraftId);
+    setFetching(false);
+    if (!ac) { setError("Could not fetch aircraft from SimBrief. Generate an OFP with this aircraft first."); return; }
+    // Auto-fill fields
+    if (ac.icaoType) setIcaoType(ac.icaoType);
+    if (ac.registration) setRegistration(ac.registration);
+    if (ac.name) setName(ac.name);
+    setFetchedSpecs({
+      maxPax: ac.maxPax,
+      maxCargoKg: ac.maxCargoKg,
+      maxFuelKg: ac.maxFuelKg,
+      emptyWeightKg: ac.emptyWeightKg,
+      maxTakeoffKg: ac.maxTakeoffKg,
+      engineType: ac.engineType,
+    });
+  };
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -226,7 +256,35 @@ function AddAircraftForm({
     <form onSubmit={onSubmit} className="rounded-xl border border-brand-500/20 bg-brand-500/[0.03] p-5 space-y-4 animate-slide-up">
       <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">New aircraft</h2>
 
-      <div className="grid grid-cols-4 gap-4">
+      {/* SimBrief import */}
+      {simbriefUsername && (
+        <div className="flex items-end gap-3">
+          <Field label="SimBrief Aircraft ID" value={simbriefAircraftId} onChange={setSimbriefAircraftId} placeholder="474071_1739520357047" />
+          <button
+            type="button"
+            onClick={() => void doFetchSimbrief()}
+            disabled={fetching || !simbriefAircraftId}
+            className="flex items-center gap-1.5 rounded-xl border border-brand-500/20 px-3 py-2.5 text-xs font-semibold text-brand-300 transition-all hover:bg-brand-500/[0.06] disabled:opacity-50"
+          >
+            {fetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            {fetching ? "Fetching..." : "Fetch from SimBrief"}
+          </button>
+        </div>
+      )}
+
+      {/* Fetched specs display */}
+      {fetchedSpecs && (
+        <div className="flex flex-wrap gap-2">
+          <SpecPill label="Max Pax" value={String(fetchedSpecs.maxPax)} />
+          <SpecPill label="MTOW" value={`${fetchedSpecs.maxTakeoffKg.toLocaleString()} kg`} />
+          <SpecPill label="OEW" value={`${fetchedSpecs.emptyWeightKg.toLocaleString()} kg`} />
+          <SpecPill label="Max Fuel" value={`${fetchedSpecs.maxFuelKg.toLocaleString()} kg`} />
+          <SpecPill label="Max Cargo" value={`${fetchedSpecs.maxCargoKg.toLocaleString()} kg`} />
+          <SpecPill label="Engines" value={fetchedSpecs.engineType} />
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-4">
         <Field label="Name" value={name} onChange={setName} placeholder="Thrustline One" required />
         <Field label="Registration" value={registration} onChange={(v) => setRegistration(v.toUpperCase())} placeholder="F-GKXS" />
         <AircraftTypePicker
@@ -235,7 +293,6 @@ function AddAircraftForm({
           onChange={(v) => setIcaoType(v)}
           required
         />
-        <Field label="SimBrief Aircraft ID" value={simbriefAircraftId} onChange={setSimbriefAircraftId} placeholder="12345" />
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -271,6 +328,17 @@ function AddAircraftForm({
         {submitting ? "Adding..." : "Add aircraft"}
       </button>
     </form>
+  );
+}
+
+/* ---------- Spec pill ---------- */
+
+function SpecPill({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex items-center gap-1.5 rounded-lg border border-emerald-500/10 bg-emerald-500/[0.03] px-2.5 py-1 text-[11px]">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-mono font-medium text-emerald-300">{value}</span>
+    </span>
   );
 }
 

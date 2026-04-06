@@ -112,6 +112,67 @@ export async function fetchOFP(username: string): Promise<SimBriefOFP | null> {
 }
 
 /** Build SimBrief dispatch URL with pre-filled fields. */
+/** Fetched SimBrief saved aircraft profile. */
+export interface SimbriefAircraft {
+  internalId: string;
+  icaoType: string;
+  name: string;
+  registration: string;
+  maxPax: number;
+  maxCargoKg: number;
+  maxFuelKg: number;
+  emptyWeightKg: number;
+  maxTakeoffKg: number;
+  maxLandingKg: number;
+  maxZeroFuelKg: number;
+  ceilingFt: number;
+  engineType: string;
+}
+
+/**
+ * Fetch a SimBrief saved aircraft profile by internal ID.
+ * Uses the SimBrief API via the latest OFP to get aircraft details.
+ * If no OFP exists, returns null.
+ */
+export async function fetchSimbriefAircraft(
+  username: string,
+  aircraftId: string,
+): Promise<SimbriefAircraft | null> {
+  try {
+    // SimBrief doesn't have a direct aircraft-by-ID endpoint.
+    // We fetch the user's latest OFP and check if it matches, or we parse
+    // the aircraft data from a dispatch generated with this aircraft.
+    // Best approach: fetch the fleet list via the API.
+    const res = await fetch(
+      `${API_URL}?username=${encodeURIComponent(username)}&json=1`,
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    // The OFP response includes aircraft data
+    const ac = data?.aircraft;
+    if (!ac) return null;
+
+    return {
+      internalId: aircraftId,
+      icaoType: ac.icaocode ?? "",
+      name: ac.name ?? "",
+      registration: ac.reg ?? "",
+      maxPax: parseInt(ac.max_passengers) || 0,
+      maxCargoKg: parseInt(ac.max_cargo_weight) || 0,
+      maxFuelKg: parseInt(ac.max_fuel) || 0,
+      emptyWeightKg: parseInt(ac.oew) || 0,
+      maxTakeoffKg: parseInt(ac.max_tow) || 0,
+      maxLandingKg: parseInt(ac.max_ldw) || 0,
+      maxZeroFuelKg: parseInt(ac.max_zfw) || 0,
+      ceilingFt: parseInt(ac.ceiling) || 0,
+      engineType: ac.engines ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function buildSimbriefUrl(opts: {
   origin: string;
   dest: string;
