@@ -155,18 +155,18 @@ export async function fetchSimbriefAircraft(
 
     return {
       internalId: aircraftId,
-      icaoType: ac.icaocode ?? "",
+      icaoType: ac.icaocode ?? ac.icao ?? "",
       name: ac.name ?? "",
       registration: ac.reg ?? "",
       maxPax: parseInt(ac.max_passengers) || 0,
-      maxCargoKg: parseInt(ac.max_cargo_weight) || 0,
-      maxFuelKg: parseInt(ac.max_fuel) || 0,
+      maxCargoKg: parseInt(ac.maxcargo) || parseInt(ac.max_cargo) || 0,
+      maxFuelKg: parseInt(ac.maxfuel) || parseInt(ac.max_fuel) || 0,
       emptyWeightKg: parseInt(ac.oew) || 0,
-      maxTakeoffKg: parseInt(ac.max_tow) || 0,
-      maxLandingKg: parseInt(ac.max_ldw) || 0,
-      maxZeroFuelKg: parseInt(ac.max_zfw) || 0,
-      ceilingFt: parseInt(ac.ceiling) || 0,
-      engineType: ac.engines ?? "",
+      maxTakeoffKg: parseInt(ac.mtow) || parseInt(ac.max_tow) || 0,
+      maxLandingKg: parseInt(ac.mlw) || parseInt(ac.max_ldw) || 0,
+      maxZeroFuelKg: parseInt(ac.mzfw) || parseInt(ac.max_zfw) || 0,
+      ceilingFt: parseInt(ac.ceiling) || parseInt(ac.service_ceiling) || 0,
+      engineType: ac.engines ?? ac.engine_type ?? "",
     };
   } catch {
     return null;

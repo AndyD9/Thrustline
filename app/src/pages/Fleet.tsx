@@ -212,7 +212,8 @@ function AddAircraftForm({
   const [fetching, setFetching] = useState(false);
   const [fetchedSpecs, setFetchedSpecs] = useState<{
     maxPax: number; maxCargoKg: number; maxFuelKg: number;
-    emptyWeightKg: number; maxTakeoffKg: number; engineType: string;
+    emptyWeightKg: number; maxTakeoffKg: number; maxLandingKg: number;
+    maxZeroFuelKg: number; engineType: string;
   } | null>(null);
 
   const doFetchSimbrief = async () => {
@@ -238,6 +239,8 @@ function AddAircraftForm({
       maxFuelKg: ac.maxFuelKg,
       emptyWeightKg: ac.emptyWeightKg,
       maxTakeoffKg: ac.maxTakeoffKg,
+      maxLandingKg: ac.maxLandingKg,
+      maxZeroFuelKg: ac.maxZeroFuelKg,
       engineType: ac.engineType,
     });
   };
@@ -306,6 +309,8 @@ function AddAircraftForm({
         <div className="flex flex-wrap gap-2">
           <SpecPill label="Max Pax" value={String(fetchedSpecs.maxPax)} />
           <SpecPill label="MTOW" value={`${fetchedSpecs.maxTakeoffKg.toLocaleString()} kg`} />
+          <SpecPill label="MLW" value={`${fetchedSpecs.maxLandingKg.toLocaleString()} kg`} />
+          <SpecPill label="MZFW" value={`${fetchedSpecs.maxZeroFuelKg.toLocaleString()} kg`} />
           <SpecPill label="OEW" value={`${fetchedSpecs.emptyWeightKg.toLocaleString()} kg`} />
           <SpecPill label="Max Fuel" value={`${fetchedSpecs.maxFuelKg.toLocaleString()} kg`} />
           <SpecPill label="Max Cargo" value={`${fetchedSpecs.maxCargoKg.toLocaleString()} kg`} />
