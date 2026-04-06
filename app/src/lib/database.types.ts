@@ -59,6 +59,7 @@ export interface Company {
   active_aircraft_id: string | null;
   simbrief_username: string | null;
   onboarded: boolean;
+  last_billing_at: string | null;
   created_at: string;
   updated_at: string;
 }

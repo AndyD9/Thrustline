@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark, Users, Plane, Receipt } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { CrewMember } from "@/lib/database.types";
 import {
   AreaChart,
   Area,
@@ -45,6 +46,10 @@ export default function Finances() {
   const { company } = useCompany();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [crewCount, setCrewCount] = useState(0);
+  const [monthlySalaries, setMonthlySalaries] = useState(0);
+  const [leasedCount, setLeasedCount] = useState(0);
+  const [monthlyLeases, setMonthlyLeases] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -63,9 +68,24 @@ export default function Finances() {
         .select("*")
         .eq("company_id", company.id)
         .order("created_at", { ascending: false }),
-    ]).then(([txRes, loanRes]) => {
+      supabase
+        .from("crew_members")
+        .select("salary_mo")
+        .eq("company_id", company.id),
+      supabase
+        .from("aircraft")
+        .select("lease_cost_mo")
+        .eq("company_id", company.id)
+        .eq("ownership", "leased"),
+    ]).then(([txRes, loanRes, crewRes, acRes]) => {
       setTransactions((txRes.data as Transaction[]) ?? []);
       setLoans((loanRes.data as Loan[]) ?? []);
+      const crewData = (crewRes.data as Pick<CrewMember, "salary_mo">[]) ?? [];
+      setCrewCount(crewData.length);
+      setMonthlySalaries(crewData.reduce((s, c) => s + c.salary_mo, 0));
+      const acData = (acRes.data as { lease_cost_mo: number }[]) ?? [];
+      setLeasedCount(acData.length);
+      setMonthlyLeases(acData.reduce((s, a) => s + a.lease_cost_mo, 0));
       setLoading(false);
     });
   }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -110,6 +130,59 @@ export default function Finances() {
           iconColor={totals.income - totals.expenses >= 0 ? "text-emerald-400" : "text-red-400"}
         />
       </div>
+
+      {/* Monthly charges breakdown */}
+      {(monthlySalaries > 0 || monthlyLeases > 0 || loans.some((l) => l.remaining_amount > 0)) && (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+          <div className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.15em] text-slate-500">
+            <Receipt className="h-3.5 w-3.5" />
+            Monthly charges (auto-deducted every 30 days)
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            {monthlySalaries > 0 && (
+              <div className="flex items-center gap-3 rounded-lg bg-white/[0.02] px-4 py-3">
+                <Users className="h-4 w-4 text-slate-500" />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Crew salaries</div>
+                  <div className="font-mono text-sm text-red-400">{currency(-monthlySalaries)}</div>
+                  <div className="text-[10px] text-slate-600">{crewCount} members</div>
+                </div>
+              </div>
+            )}
+            {monthlyLeases > 0 && (
+              <div className="flex items-center gap-3 rounded-lg bg-white/[0.02] px-4 py-3">
+                <Plane className="h-4 w-4 text-slate-500" />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Aircraft leases</div>
+                  <div className="font-mono text-sm text-red-400">{currency(-monthlyLeases)}</div>
+                  <div className="text-[10px] text-slate-600">{leasedCount} aircraft</div>
+                </div>
+              </div>
+            )}
+            {loans.filter((l) => l.remaining_amount > 0).length > 0 && (
+              <div className="flex items-center gap-3 rounded-lg bg-white/[0.02] px-4 py-3">
+                <Landmark className="h-4 w-4 text-slate-500" />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Loan payments</div>
+                  <div className="font-mono text-sm text-red-400">
+                    {currency(-loans.filter((l) => l.remaining_amount > 0).reduce((s, l) => s + l.monthly_payment, 0))}
+                  </div>
+                  <div className="text-[10px] text-slate-600">{loans.filter((l) => l.remaining_amount > 0).length} active</div>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-3 rounded-lg bg-white/[0.02] px-4 py-3">
+              <Receipt className="h-4 w-4 text-amber-400" />
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500">Total / month</div>
+                <div className="font-mono text-sm font-bold text-amber-400">
+                  {currency(-(monthlySalaries + monthlyLeases + loans.filter((l) => l.remaining_amount > 0).reduce((s, l) => s + l.monthly_payment, 0)))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cashflow chart */}
       {cashflowData.length > 2 && (

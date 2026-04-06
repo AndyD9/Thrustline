@@ -8,12 +8,16 @@ import {
 } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { monthsDue, runBillingCycle, type BillingResult } from "@/lib/billing";
 import type { Company } from "@/lib/database.types";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 interface CompanyContextValue {
   company: Company | null;
   loading: boolean;
+  /** Last billing result (shown once then cleared). */
+  billingResult: BillingResult | null;
+  clearBillingResult: () => void;
   /** Force a refetch — call this after creating/updating the company. */
   refetch: () => Promise<void>;
 }
@@ -32,6 +36,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
+  const [billingResult, setBillingResult] = useState<BillingResult | null>(null);
+  const [billingDone, setBillingDone] = useState(false);
+  const clearBillingResult = useCallback(() => setBillingResult(null), []);
 
   const fetchCompany = useCallback(async () => {
     if (!user) {
@@ -46,7 +53,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       .eq("user_id", user.id)
       .maybeSingle();
     if (error) {
-      // eslint-disable-next-line no-console
       console.error("[CompanyContext] fetch failed:", error);
       setCompany(null);
     } else {
@@ -54,6 +60,22 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     }
     setLoading(false);
   }, [user]);
+
+  // Run billing cycle once after company loads
+  useEffect(() => {
+    if (!company || billingDone) return;
+    if (monthsDue(company) > 0) {
+      setBillingDone(true);
+      void runBillingCycle(company).then((result) => {
+        if (result) {
+          setBillingResult(result);
+          void fetchCompany(); // Refresh capital
+        }
+      });
+    } else {
+      setBillingDone(true);
+    }
+  }, [company, billingDone, fetchCompany]);
 
   useEffect(() => {
     void fetchCompany();
@@ -88,7 +110,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   return (
-    <CompanyContext.Provider value={{ company, loading, refetch: fetchCompany }}>
+    <CompanyContext.Provider value={{ company, loading, billingResult, clearBillingResult, refetch: fetchCompany }}>
       {children}
     </CompanyContext.Provider>
   );
