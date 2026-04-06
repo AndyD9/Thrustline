@@ -119,6 +119,7 @@ export function buildSimbriefUrl(opts: {
   airline?: string;
   flightNumber?: string;
   callsign?: string;
+  pax?: number;
 }): string {
   const params = new URLSearchParams({
     orig: opts.origin,
@@ -128,5 +129,6 @@ export function buildSimbriefUrl(opts: {
   if (opts.airline) params.set("airline", opts.airline);
   if (opts.flightNumber) params.set("fltnum", opts.flightNumber);
   if (opts.callsign) params.set("callsign", opts.callsign);
+  if (opts.pax && opts.pax > 0) params.set("pax", String(opts.pax));
   return `https://dispatch.simbrief.com/options/custom?${params}`;
 }

@@ -440,6 +440,7 @@ function NewDispatchForm({
                 airline: airlineCode,
                 flightNumber: flightNumber.replace(airlineCode, ""),
                 callsign,
+                pax: Number(paxEco) + Number(paxBiz),
               }));
             }}
             className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-3 py-2 text-xs font-semibold text-slate-300 transition-all hover:border-white/[0.15] hover:text-white"
