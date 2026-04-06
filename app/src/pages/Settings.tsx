@@ -9,7 +9,10 @@ export default function Settings() {
     const ctrl = new AbortController();
     getHealth(ctrl.signal)
       .then(setHealth)
-      .catch((e) => setError(e instanceof Error ? e.message : "unreachable"));
+      .catch((e) => {
+        if (ctrl.signal.aborted) return; // React StrictMode double-render cleanup
+        setError(e instanceof Error ? e.message : "unreachable");
+      });
     return () => ctrl.abort();
   }, []);
 
