@@ -17,16 +17,20 @@
     <PackageReference Include="Supabase" Version="1.1.1" />
   </ItemGroup>
 
-  <!-- SimConnect SDK (Windows only). The managed wrapper DLL lives in the MSFS SDK.
-       On Windows dev, set MSFS_SDK env var to the installed SDK path and uncomment below.
-       For now we build cross-platform against the Mock client only. -->
-  <!--
-  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
+  <!-- Compilation conditionnelle : active le flag WINDOWS sur Windows
+       pour que NativeSimConnectClient.cs (#if WINDOWS) soit compilé. -->
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT' OR $([MSBuild]::IsOSPlatform('Windows'))">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
+
+  <!-- SimConnect SDK (Windows only). Le wrapper managé vit dans le MSFS SDK.
+       Sur Windows, set MSFS_SDK env var vers le dossier SDK installé.
+       Si la DLL n'est pas trouvée, le build réussit quand même (mock only). -->
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT' AND Exists('$(MSFS_SDK)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">
     <Reference Include="Microsoft.FlightSimulator.SimConnect">
       <HintPath>$(MSFS_SDK)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
-  -->
 
 </Project>

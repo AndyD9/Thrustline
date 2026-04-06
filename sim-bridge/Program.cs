@@ -38,8 +38,11 @@ if (simBridgeConfig.UseMockSimConnect || !OperatingSystem.IsWindows())
 }
 else
 {
-    // Real Windows SimConnect client (to be wired once Microsoft.FlightSimulator.SimConnect.dll is referenced)
+#if WINDOWS
+    builder.Services.AddSingleton<ISimClient, NativeSimConnectClient>();
+#else
     builder.Services.AddSingleton<ISimClient, MockSimClient>();
+#endif
 }
 builder.Services.AddHostedService<SimConnectWorker>();
 

@@ -41,3 +41,25 @@ export async function clearSession(): Promise<void> {
 
 /** Base URL du SignalR hub /hubs/sim — utilisé par useSimStream. */
 export const SIM_HUB_URL = `${BASE_URL}/hubs/sim`;
+
+/**
+ * Attends que le sim-bridge réponde à /health (retry avec backoff).
+ * Utile au démarrage quand le sidecar met quelques secondes à se lancer.
+ * Retourne true si le bridge est accessible, false si timeout.
+ */
+export async function waitForBridge(
+  maxAttempts = 15,
+  intervalMs = 2000,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      await getHealth(signal);
+      return true;
+    } catch {
+      if (signal?.aborted) return false;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  }
+  return false;
+}

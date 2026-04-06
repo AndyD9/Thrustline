@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Company } from "@/lib/database.types";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 interface CompanyContextValue {
   company: Company | null;
@@ -21,9 +22,11 @@ const CompanyContext = createContext<CompanyContextValue | null>(null);
 
 /**
  * Charge la compagnie de l'utilisateur connecté (1 par user) et expose un
- * état partagé à toute l'app via un contexte unique. Indispensable pour que
- * Onboarding puisse déclencher un refetch qui mettra à jour App.tsx (qui
- * décide s'il faut afficher /onboarding ou le Layout complet).
+ * état partagé à toute l'app via un contexte unique.
+ *
+ * Utilise Supabase Realtime pour mettre à jour le capital (et tout autre
+ * champ) en temps réel quand le sim-bridge écrit dans Supabase, sans
+ * avoir besoin d'un refetch complet.
  */
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -55,6 +58,34 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void fetchCompany();
   }, [fetchCompany]);
+
+  // Supabase Realtime: subscribe to changes on the user's company row.
+  // Updates capital, active_aircraft_id, etc. in real time without refetch.
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`company:${user.id}`)
+      .on(
+        "postgres_changes" as "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "companies",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: RealtimePostgresChangesPayload<Company>) => {
+          if (payload.new) {
+            setCompany(payload.new as Company);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   return (
     <CompanyContext.Provider value={{ company, loading, refetch: fetchCompany }}>
