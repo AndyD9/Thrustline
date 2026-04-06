@@ -150,27 +150,27 @@ export async function fetchSimbriefAircraft(
     const data = await res.json();
 
     // Aircraft identification is in data.aircraft
-    const ac = data?.aircraft;
+    const ac = data?.aircraft ?? {};
     // Weight limits are in data.weights
     const wt = data?.weights ?? {};
-    // Fuel data in data.fuel or data.aircraft
+    // Fuel data in data.fuel
     const fl = data?.fuel ?? {};
-    if (!ac) return null;
+    if (!ac.icaocode && !ac.icao_code) return null;
 
     return {
-      internalId: aircraftId,
-      icaoType: ac.icaocode ?? ac.icao ?? "",
+      internalId: ac.internal_id ?? aircraftId,
+      icaoType: ac.icaocode ?? ac.icao_code ?? "",
       name: ac.name ?? "",
       registration: ac.reg ?? "",
-      maxPax: parseInt(ac.max_passengers) || parseInt(wt.pax_count) || 0,
-      maxCargoKg: parseInt(wt.max_cargo) || parseInt(ac.maxcargo) || 0,
-      maxFuelKg: parseInt(ac.maxfuel) || parseInt(fl.max_fuel) || 0,
-      emptyWeightKg: parseInt(wt.oew) || parseInt(ac.oew) || 0,
-      maxTakeoffKg: parseInt(wt.max_tow) || parseInt(ac.mtow) || 0,
-      maxLandingKg: parseInt(wt.max_ldw) || parseInt(ac.mlw) || 0,
-      maxZeroFuelKg: parseInt(wt.max_zfw) || parseInt(ac.mzfw) || 0,
-      ceilingFt: parseInt(ac.ceiling) || parseInt(ac.service_ceiling) || 0,
-      engineType: ac.engines ?? ac.engine_type ?? "",
+      maxPax: parseInt(ac.max_passengers) || 0,
+      maxCargoKg: parseInt(wt.cargo) || 0,
+      maxFuelKg: parseInt(fl.max_tanks) || 0,         // fuel.max_tanks = max fuel capacity
+      emptyWeightKg: parseInt(wt.oew) || 0,
+      maxTakeoffKg: parseInt(wt.max_tow_struct) || parseInt(wt.max_tow) || 0, // structural MTOW for pricing
+      maxLandingKg: parseInt(wt.max_ldw) || 0,
+      maxZeroFuelKg: parseInt(wt.max_zfw) || 0,
+      ceilingFt: 0, // not in OFP response
+      engineType: ac.engines ?? "",
     };
   } catch {
     return null;
