@@ -12,6 +12,7 @@ import { haversineNm } from "@/lib/geo";
 import { fetchOFP, buildSimbriefUrl, type SimBriefOFP } from "@/lib/simbrief";
 import { startMockFlight } from "@/lib/simBridge";
 import { useUnits } from "@/contexts/UnitsContext";
+import { computePaxDemand } from "@/lib/paxDemand";
 import { open as shellOpen } from "@tauri-apps/plugin-shell";
 
 const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: string }> = {
@@ -310,16 +311,34 @@ function NewDispatchForm({
   const cruiseSpeed = acType?.cruiseSpeedKts ?? 450;
   const outOfRange = routeDistanceNm !== null && acType && routeDistanceNm > acType.rangeNm;
 
+  // Dynamic pax demand
+  const demand = originApt && destApt && acType && routeDistanceNm
+    ? computePaxDemand({ origin: originApt, dest: destApt, aircraftType: acType, distanceNm: routeDistanceNm })
+    : null;
+
+  // Auto-fill pax from dynamic demand (or fallback to max)
+  const updatePaxFromDemand = (type: typeof acType, orig?: typeof originApt, dest?: typeof destApt) => {
+    const o = orig ?? originApt;
+    const d = dest ?? destApt;
+    if (!type) return;
+    if (!o || !d) {
+      setPaxEco(String(type.maxPaxEco));
+      setPaxBiz(String(type.maxPaxBiz));
+      return;
+    }
+    const dist = Math.round(haversineNm(o.lat, o.lon, d.lat, d.lon));
+    const demand = computePaxDemand({ origin: o, dest: d, aircraftType: type, distanceNm: dist });
+    setPaxEco(String(demand.eco));
+    setPaxBiz(String(demand.biz));
+  };
+
   const onAircraftChange = (id: string) => {
     setAircraftId(id);
     const ac = aircraft.find((a) => a.id === id);
     if (ac) {
       setIcaoType(ac.icao_type);
       const type = aircraftTypeByIcao[ac.icao_type];
-      if (type) {
-        setPaxEco(String(type.maxPaxEco));
-        setPaxBiz(String(type.maxPaxBiz));
-      }
+      if (type) updatePaxFromDemand(type);
     }
   };
 
@@ -365,8 +384,8 @@ function NewDispatchForm({
 
       {/* ── Step 1: Route ────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
-        <AirportPicker label="Origin (ICAO)" value={originIcao} onChange={setOriginIcao} placeholder="LFPG" required />
-        <AirportPicker label="Destination (ICAO)" value={destIcao} onChange={setDestIcao} placeholder="KJFK" required />
+        <AirportPicker label="Origin (ICAO)" value={originIcao} onChange={(v) => { setOriginIcao(v); if (acType) updatePaxFromDemand(acType, airportByIcao[v], destApt); }} placeholder="LFPG" required />
+        <AirportPicker label="Destination (ICAO)" value={destIcao} onChange={(v) => { setDestIcao(v); if (acType) updatePaxFromDemand(acType, originApt, airportByIcao[v]); }} placeholder="KJFK" required />
       </div>
 
       {routeDistanceNm !== null && (
@@ -416,6 +435,18 @@ function NewDispatchForm({
       </div>
 
       {/* ── Step 3: Load ─────────────────────────────── */}
+      {demand && (
+        <div className={`flex items-center gap-2 text-xs ${
+          demand.loadFactor >= 0.80 ? "text-emerald-400" :
+          demand.loadFactor >= 0.50 ? "text-amber-400" :
+          "text-red-400"
+        }`}>
+          <Users className="h-3.5 w-3.5" />
+          Demand: {Math.round(demand.loadFactor * 100)}% load factor
+          <span className="text-slate-600">·</span>
+          <span className="text-slate-400">{demand.eco}/{acType?.maxPaxEco} eco · {demand.biz}/{acType?.maxPaxBiz} biz</span>
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-4">
         <FieldWithMax label="Pax economy" value={paxEco} onChange={setPaxEco} type="number" required max={acType?.maxPaxEco} />
         <FieldWithMax label="Pax business" value={paxBiz} onChange={setPaxBiz} type="number" required max={acType?.maxPaxBiz} />
