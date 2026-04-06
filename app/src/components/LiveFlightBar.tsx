@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { useSim } from "@/contexts/SimContext";
 import { useUnits } from "@/contexts/UnitsContext";
+import { useCompany } from "@/contexts/CompanyContext";
+import { supabase } from "@/lib/supabase";
 import { Gauge, Navigation, Compass, Fuel, ArrowUpDown, Plane } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -10,6 +13,24 @@ import type { LucideIcon } from "lucide-react";
 export function LiveFlightBar() {
   const { latest, simActive } = useSim();
   const { fmt } = useUnits();
+  const { company } = useCompany();
+  const [flightInfo, setFlightInfo] = useState<{ flightNumber: string; origin: string; dest: string } | null>(null);
+
+  // Fetch the currently flying dispatch
+  useEffect(() => {
+    if (!company || !simActive) { setFlightInfo(null); return; }
+    supabase
+      .from("dispatches")
+      .select("flight_number, origin_icao, dest_icao")
+      .eq("company_id", company.id)
+      .eq("status", "flying")
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) setFlightInfo({ flightNumber: data.flight_number, origin: data.origin_icao, dest: data.dest_icao });
+      });
+  }, [company?.id, simActive]);
+
   if (!latest || !simActive) return null;
 
   const {
@@ -24,6 +45,16 @@ export function LiveFlightBar() {
 
   return (
     <div className="mx-3 mb-3 flex flex-wrap items-center gap-5 rounded-xl border border-brand-500/20 bg-brand-500/[0.04] px-5 py-3 text-xs glow-brand-sm animate-fade-in">
+      {/* Flight info */}
+      {flightInfo && (
+        <>
+          <span className="font-mono text-sm font-bold text-brand-300">{flightInfo.flightNumber}</span>
+          <span className="font-mono text-sm text-slate-300">
+            {flightInfo.origin} <span className="text-slate-600">→</span> {flightInfo.dest}
+          </span>
+          <div className="h-4 w-px bg-white/[0.06]" />
+        </>
+      )}
       <Stat label="PHASE" value={onGround ? "GROUND" : "AIRBORNE"} icon={Plane} accent />
       <div className="h-4 w-px bg-white/[0.06]" />
       <Stat label="ALT" value={fmt.altitude(altitudeFt)} icon={ArrowUpDown} />
