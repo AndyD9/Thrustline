@@ -33,6 +33,9 @@ public class CompanyRow : BaseModel
     [Column("onboarded")]
     public bool Onboarded { get; set; }
 
+    [Column("global_reputation")]
+    public decimal GlobalReputation { get; set; } = 50m;
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 

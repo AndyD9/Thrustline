@@ -35,6 +35,7 @@ public class LandingProcessor
     private readonly PaxSatisfactionService _paxSatisfaction;
     private readonly AcarsService _acars;
     private readonly AchievementService _achievements;
+    private readonly CompanyBonusService _bonuses;
     private readonly ILogger<LandingProcessor> _log;
 
     public LandingProcessor(
@@ -48,6 +49,7 @@ public class LandingProcessor
         PaxSatisfactionService paxSatisfaction,
         AcarsService acars,
         AchievementService achievements,
+        CompanyBonusService bonuses,
         ILogger<LandingProcessor> log)
     {
         _supabase = supabase;
@@ -60,6 +62,7 @@ public class LandingProcessor
         _paxSatisfaction = paxSatisfaction;
         _acars = acars;
         _achievements = achievements;
+        _bonuses = bonuses;
         _log = log;
     }
 
@@ -124,28 +127,49 @@ public class LandingProcessor
             var reputation = repResp.Models.FirstOrDefault();
             var repScore = reputation?.Score ?? 50m;
 
-            // 5. Calculs
+            // 5. Load company bonuses (partnerships + marketing campaigns + route pricing)
+            decimal routePriceModifier = 1.0m;
+            try
+            {
+                var routeData = await client.From<RouteRow>()
+                    .Where(r => r.CompanyId == company.Id)
+                    .Where(r => r.OriginIcao == dispatch.OriginIcao)
+                    .Where(r => r.DestIcao == dispatch.DestIcao)
+                    .Limit(1)
+                    .Get(ct);
+                var route = routeData.Models.FirstOrDefault();
+                if (route is not null) routePriceModifier = route.PriceModifier;
+            }
+            catch { /* route may not exist yet, default 1.0 is fine */ }
+
+            var bonuses = await _bonuses.GetActiveBonusesAsync(
+                company.Id, dispatch.OriginIcao, dispatch.DestIcao, routePriceModifier, ct);
+
+            // 6. Calculs (with bonuses applied)
             var distanceNm = (decimal)evt.DistanceNm;
             var fuelUsedGal = (decimal)evt.FuelUsedGal;
             var landingVsFpm = (decimal)evt.LandingVsFpm;
 
-            var revenue = _yield.Compute(dispatch.PaxEco, dispatch.PaxBiz, distanceNm, repScore);
-            var fin = _cashflow.Compute(revenue, fuelUsedGal);
+            var revenue = _yield.Compute(dispatch.PaxEco, dispatch.PaxBiz, distanceNm, repScore, bonuses.PriceModifier);
+            var fuelMult = 1.0m - bonuses.FuelDiscount; // e.g., 0.10 discount → 0.90 multiplier
+            var fin = _cashflow.Compute(revenue, fuelUsedGal, fuelMult);
 
-            // Landing grade, fuel validation, pax satisfaction
+            // Landing grade, fuel validation, pax satisfaction (with catering bonus)
             var gradeResult = _grade.Compute(landingVsFpm);
             var fuelResult = _fuelValidation.Compute(fuelUsedGal, dispatch);
-            var paxSat = _paxSatisfaction.Compute(landingVsFpm, evt.DurationMin, dispatch);
+            var paxSat = _paxSatisfaction.Compute(landingVsFpm, evt.DurationMin, dispatch, bonuses.PaxSatisfactionBonus);
 
             MaintenanceUpdate? maint = null;
             if (aircraft is not null)
             {
+                var wearMult = 1.0m - bonuses.MaintenanceDiscount; // e.g., 0.15 → 0.85
                 maint = _maintenance.Apply(
                     aircraft.HealthPct,
                     aircraft.Cycles,
                     aircraft.TotalHours,
                     evt.DurationMin,
-                    landingVsFpm);
+                    landingVsFpm,
+                    wearMult);
             }
 
             // 6. Insert flight
@@ -261,6 +285,13 @@ public class LandingProcessor
 
             // 13. Check achievements
             await _achievements.CheckAndAwardAsync(insertedFlight, company, userId.Value, ct);
+
+            // 14. Update global reputation
+            var globalRep = await _bonuses.RecalculateGlobalReputationAsync(company.Id, ct);
+            await client.From<CompanyRow>()
+                .Where(c => c.Id == company.Id)
+                .Set(c => c.GlobalReputation, globalRep)
+                .Update(cancellationToken: ct);
 
             _log.LogInformation(
                 "✅ Landing persisted: flight {Flight} {From}→{To} grade={Grade} revenue={Rev:C} fuel={Fuel:C} net={Net:C} paxSat={Pax:F0}",

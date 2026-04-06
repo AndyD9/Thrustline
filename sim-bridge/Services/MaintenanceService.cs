@@ -20,7 +20,8 @@ public class MaintenanceService
         int currentCycles,
         decimal currentTotalHours,
         int durationMin,
-        decimal landingVsFpm)
+        decimal landingVsFpm,
+        decimal wearMultiplier = 1.0m)
     {
         var absVs = Math.Abs(landingVsFpm);
 
@@ -28,6 +29,9 @@ public class MaintenanceService
         if (absVs > 1500m)      penalty = 12m;
         else if (absVs > 1000m) penalty = 5m;
         else if (absVs > 600m)  penalty = 2m;
+
+        // MRO partnership reduces wear
+        penalty *= Math.Clamp(wearMultiplier, 0.5m, 1.0m);
 
         var newHealth = Math.Max(0m, currentHealthPct - penalty);
         var newCycles = currentCycles + 1;

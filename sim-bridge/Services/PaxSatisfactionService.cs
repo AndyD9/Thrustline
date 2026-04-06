@@ -13,12 +13,12 @@ public class PaxSatisfactionService
     /// <summary>
     /// Calcule la satisfaction passagers.
     /// </summary>
-    public decimal Compute(decimal landingVsFpm, int durationMin, DispatchRow? dispatch)
+    public decimal Compute(decimal landingVsFpm, int durationMin, DispatchRow? dispatch, decimal cateringBonus = 0m)
     {
         var landingScore = ComputeLandingScore(landingVsFpm);
         var punctualityScore = ComputePunctualityScore(durationMin, dispatch);
 
-        var weighted = landingScore * 0.6m + punctualityScore * 0.4m;
+        var weighted = landingScore * 0.6m + punctualityScore * 0.4m + cateringBonus;
         return Math.Round(Math.Clamp(weighted, 0m, 100m), 2);
     }
 

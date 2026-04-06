@@ -59,6 +59,7 @@ export interface Company {
   active_aircraft_id: string | null;
   simbrief_username: string | null;
   onboarded: boolean;
+  global_reputation: number;
   last_billing_at: string | null;
   created_at: string;
   updated_at: string;
@@ -90,6 +91,7 @@ export interface Route {
   dest_icao: string;
   distance_nm: number;
   base_price: number;
+  price_modifier: number;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -188,6 +190,34 @@ export interface AcarsReport {
   created_at: string;
 }
 
+export interface MarketingCampaign {
+  id: string;
+  user_id: string;
+  company_id: string;
+  campaign_type: string;
+  scope: string;
+  target_route: string | null;
+  demand_multiplier: number;
+  daily_cost: number;
+  started_at: string;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface Partnership {
+  id: string;
+  user_id: string;
+  company_id: string;
+  partner_key: string;
+  partner_name: string;
+  bonus_type: string;
+  bonus_value: number;
+  monthly_cost: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Achievement {
   id: string;
   user_id: string;
@@ -263,8 +293,10 @@ export interface Database {
       loans:        { Row: Row<Loan>;        Insert: Insert<Loan>;        Update: Update<Loan> };
       game_events:  { Row: Row<GameEvent>;   Insert: Insert<GameEvent>;   Update: Update<GameEvent> };
       transactions:  { Row: Row<Transaction>;  Insert: Insert<Transaction>;  Update: Update<Transaction> };
-      acars_reports: { Row: Row<AcarsReport>;  Insert: Insert<AcarsReport>;  Update: Update<AcarsReport> };
-      achievements:  { Row: Row<Achievement>;  Insert: Insert<Achievement>;  Update: Update<Achievement> };
+      acars_reports:        { Row: Row<AcarsReport>;        Insert: Insert<AcarsReport>;        Update: Update<AcarsReport> };
+      achievements:         { Row: Row<Achievement>;         Insert: Insert<Achievement>;         Update: Update<Achievement> };
+      marketing_campaigns:  { Row: Row<MarketingCampaign>;   Insert: Insert<MarketingCampaign>;   Update: Update<MarketingCampaign> };
+      partnerships:         { Row: Row<Partnership>;          Insert: Insert<Partnership>;          Update: Update<Partnership> };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

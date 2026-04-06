@@ -81,6 +81,10 @@ export function computePaxDemand(opts: {
   distanceNm: number;
   reputationScore?: number;
   date?: Date;
+  /** Multiplier from marketing campaigns + GDS partnership (default 1.0) */
+  campaignMultiplier?: number;
+  /** Route price modifier: >1 = premium (less pax), <1 = discount (more pax) */
+  priceModifier?: number;
 }): PaxDemand {
   const {
     origin,
@@ -89,6 +93,8 @@ export function computePaxDemand(opts: {
     distanceNm,
     reputationScore = 50,
     date = new Date(),
+    campaignMultiplier = 1.0,
+    priceModifier = 1.0,
   } = opts;
 
   const baseLF = 0.70;
@@ -98,8 +104,12 @@ export function computePaxDemand(opts: {
   const time = timeFactor(date.getHours());
   const rep = reputationFactor(reputationScore);
   const rand = randomFactor();
+  // Price effect: premium pricing reduces pax, discount increases
+  // priceModifier 1.3 (premium) → priceFactor ~0.85, priceModifier 0.8 (discount) → ~1.12
+  const priceFactor = clamp(1 / priceModifier * 0.5 + 0.5, 0.70, 1.30);
+  const campaign = clamp(campaignMultiplier, 1.0, 2.0);
 
-  const loadFactor = clamp(baseLF * dist * hub * season * time * rep * rand, 0.20, 0.98);
+  const loadFactor = clamp(baseLF * dist * hub * season * time * rep * rand * priceFactor * campaign, 0.20, 0.98);
 
   // Business class fills at ~60% of economy load factor
   const bizLoadFactor = clamp(loadFactor * 0.6, 0.10, 0.90);

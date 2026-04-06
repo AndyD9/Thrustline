@@ -13,6 +13,7 @@ import Crew from "@/pages/Crew";
 import Finances from "@/pages/Finances";
 import Settings from "@/pages/Settings";
 import LiveFlight from "@/pages/LiveFlight";
+import CompanyPage from "@/pages/Company";
 import RoutesPage from "@/pages/Routes";
 import Achievements from "@/pages/Achievements";
 import EFB from "@/pages/EFB";
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/crew" element={<Crew />} />
         <Route path="/finances" element={<Finances />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/company" element={<CompanyPage />} />
         <Route path="/routes" element={<RoutesPage />} />
         <Route path="/achievements" element={<Achievements />} />
         <Route path="/efb" element={<EFB />} />

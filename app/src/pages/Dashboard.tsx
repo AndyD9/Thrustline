@@ -166,6 +166,13 @@ export default function Dashboard() {
           iconColor="text-red-400"
           sub={`Net: ${currency(totalRevenue - totalExpenses)}`}
         />
+        <KpiCard
+          label="Global Reputation"
+          value={`${(company.global_reputation ?? 50).toFixed(0)}/100`}
+          icon={Star}
+          iconColor="text-amber-300"
+          sub={(company.global_reputation ?? 50) >= 70 ? "Excellent" : (company.global_reputation ?? 50) >= 40 ? "Average" : "Poor"}
+        />
       </div>
 
       {/* Flight in progress */}

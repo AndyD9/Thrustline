@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Trophy,
   BookOpen,
+  Building2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -30,6 +31,7 @@ const NAV: NavItem[] = [
   { to: "/dispatch",     label: "Dispatch",     icon: ClipboardList },
   { to: "/fleet",        label: "Fleet",        icon: Warehouse },
   { to: "/crew",         label: "Crew",         icon: Users },
+  { to: "/company",      label: "Company",      icon: Building2 },
   { to: "/routes",       label: "Routes",       icon: TrendingUp },
   { to: "/achievements", label: "Achievements", icon: Trophy },
   { to: "/efb",          label: "EFB",          icon: BookOpen },

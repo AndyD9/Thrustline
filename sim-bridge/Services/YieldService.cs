@@ -18,13 +18,18 @@ public class YieldService
     private const decimal PricePerPaxNm = 0.18m;
     private const decimal BizMultiplier = 3.0m;
 
-    public decimal Compute(int paxEco, int paxBiz, decimal distanceNm, decimal reputationScore)
+    public decimal Compute(
+        int paxEco,
+        int paxBiz,
+        decimal distanceNm,
+        decimal reputationScore,
+        decimal priceModifier = 1.0m)
     {
         if (distanceNm <= 0 || (paxEco == 0 && paxBiz == 0)) return 0m;
 
         var repMult = 0.5m + (Math.Clamp(reputationScore, 0m, 100m) / 100m);
         var effectivePax = paxEco + (paxBiz * BizMultiplier);
-        var revenue = effectivePax * PricePerPaxNm * distanceNm * repMult;
+        var revenue = effectivePax * PricePerPaxNm * distanceNm * repMult * Math.Clamp(priceModifier, 0.5m, 2.0m);
         return Math.Round(revenue, 2);
     }
 }

@@ -33,6 +33,7 @@ builder.Services.AddSingleton<FuelValidationService>();
 builder.Services.AddSingleton<PaxSatisfactionService>();
 builder.Services.AddSingleton<AcarsService>();
 builder.Services.AddSingleton<AchievementService>();
+builder.Services.AddSingleton<CompanyBonusService>();
 builder.Services.AddSingleton<LandingProcessor>();
 
 // --- SimConnect layer ---
