@@ -26,7 +26,8 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import type { Flight, Transaction, Reputation } from "@/lib/database.types";
+import type { Flight, Transaction, Reputation, GameEvent } from "@/lib/database.types";
+import { fetchActiveEvents } from "@/lib/gameEvents";
 import FlightMap, { type RouteArc } from "@/components/FlightMap";
 import { airportByIcao } from "@/data/airports";
 
@@ -40,6 +41,7 @@ export default function Dashboard() {
   const [recentFlights, setRecentFlights] = useState<Flight[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reputations, setReputations] = useState<Reputation[]>([]);
+  const [activeEvents, setActiveEvents] = useState<GameEvent[]>([]);
 
   useEffect(() => {
     if (!company) return;
@@ -67,6 +69,8 @@ export default function Dashboard() {
       setTransactions((txRes.data as Transaction[]) ?? []);
       setReputations((repRes.data as Reputation[]) ?? []);
     });
+    // Fetch active events separately
+    fetchActiveEvents(company.id).then((events) => setActiveEvents(events as GameEvent[]));
   }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <Placeholder label="Loading company…" />;
@@ -106,6 +110,31 @@ export default function Dashboard() {
           Hub {company.hub_icao}
         </p>
       </header>
+
+      {/* Active world events */}
+      {activeEvents.length > 0 && (
+        <div className="space-y-2">
+          {activeEvents.map((ev) => {
+            const isPositive = ev.modifier > 1;
+            const remaining = Math.max(0, Math.ceil((new Date(ev.expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+            const colors = isPositive
+              ? "border-emerald-500/20 bg-emerald-500/[0.04] text-emerald-300"
+              : "border-red-500/20 bg-red-500/[0.04] text-red-300";
+            return (
+              <div key={ev.id} className={`flex items-center justify-between rounded-xl border px-4 py-3 text-xs ${colors}`}>
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold">{ev.title}</span>
+                  <span className="text-slate-400">{ev.description}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="font-mono font-bold">{isPositive ? "+" : ""}{Math.round((ev.modifier - 1) * 100)}%</span>
+                  <span className="text-slate-500">{remaining}d left</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

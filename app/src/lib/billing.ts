@@ -1,6 +1,7 @@
 // Monthly billing cycle — deducts crew salaries, aircraft leases, and loan payments
 
 import { supabase } from "./supabase";
+import { maybeGenerateEvents } from "./gameEvents";
 import type { Company, CrewMember, Aircraft, Loan } from "./database.types";
 
 const BILLING_INTERVAL_DAYS = 30;
@@ -121,6 +122,12 @@ export async function runBillingCycle(company: Company): Promise<BillingResult |
         remaining_amount: newRemaining,
       })
       .eq("id", loan.id);
+  }
+
+  // Maybe generate random world events (~30% chance per billing cycle)
+  const eventsGenerated = await maybeGenerateEvents(company.id, company.user_id);
+  if (eventsGenerated > 0) {
+    details.push(`${eventsGenerated} new world event${eventsGenerated > 1 ? "s" : ""} occurred!`);
   }
 
   return { monthsBilled: months, totalSalaries, totalLeases, totalLoanPayments, totalDeducted, details };
