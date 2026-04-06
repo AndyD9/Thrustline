@@ -5,10 +5,11 @@ import { LiveFlightBar } from "./LiveFlightBar";
 
 export function Layout() {
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="flex h-screen w-screen overflow-hidden bg-surface-0">
       <Sidebar />
 
       <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Top bar */}
         <header className="flex items-center justify-between px-6 py-4">
           <div />
           <SimStatusBadge />

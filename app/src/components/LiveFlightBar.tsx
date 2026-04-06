@@ -1,4 +1,6 @@
 import { useSim } from "@/contexts/SimContext";
+import { Gauge, Navigation, Compass, Fuel, ArrowUpDown, Plane } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 function formatNumber(n: number, digits = 0) {
   return n.toLocaleString(undefined, {
@@ -26,14 +28,15 @@ export function LiveFlightBar() {
   } = latest;
 
   return (
-    <div className="glass mx-3 mb-3 flex flex-wrap items-center gap-6 px-5 py-3 text-xs">
-      <Stat label="PHASE" value={onGround ? "GROUND" : "AIRBORNE"} accent />
-      <Stat label="ALT" value={`${formatNumber(altitudeFt)} ft`} />
-      <Stat label="GS"  value={`${formatNumber(groundSpeedKts)} kt`} />
-      <Stat label="IAS" value={`${formatNumber(indicatedAirspeedKts)} kt`} />
-      <Stat label="HDG" value={`${formatNumber(headingDeg)}°`} />
-      <Stat label="V/S" value={`${formatNumber(verticalSpeedFpm)} fpm`} />
-      <Stat label="FUEL" value={`${formatNumber(fuelTotalGal)} gal`} />
+    <div className="mx-3 mb-3 flex flex-wrap items-center gap-5 rounded-xl border border-brand-500/20 bg-brand-500/[0.04] px-5 py-3 text-xs glow-brand-sm animate-fade-in">
+      <Stat label="PHASE" value={onGround ? "GROUND" : "AIRBORNE"} icon={Plane} accent />
+      <div className="h-4 w-px bg-white/[0.06]" />
+      <Stat label="ALT" value={`${formatNumber(altitudeFt)} ft`} icon={ArrowUpDown} />
+      <Stat label="GS"  value={`${formatNumber(groundSpeedKts)} kt`} icon={Gauge} />
+      <Stat label="IAS" value={`${formatNumber(indicatedAirspeedKts)} kt`} icon={Navigation} />
+      <Stat label="HDG" value={`${formatNumber(headingDeg)}°`} icon={Compass} />
+      <Stat label="V/S" value={`${formatNumber(verticalSpeedFpm)} fpm`} icon={ArrowUpDown} />
+      <Stat label="FUEL" value={`${formatNumber(fuelTotalGal)} gal`} icon={Fuel} />
     </div>
   );
 }
@@ -41,22 +44,27 @@ export function LiveFlightBar() {
 function Stat({
   label,
   value,
+  icon: Icon,
   accent = false,
 }: {
   label: string;
   value: string;
+  icon: LucideIcon;
   accent?: boolean;
 }) {
   return (
-    <div className="flex items-baseline gap-2">
-      <span className="text-[10px] uppercase tracking-wider text-slate-500">
-        {label}
-      </span>
-      <span
-        className={`font-mono text-sm ${accent ? "text-brand-300" : "text-slate-100"}`}
-      >
-        {value}
-      </span>
+    <div className="flex items-center gap-2">
+      <Icon className={`h-3.5 w-3.5 ${accent ? "text-brand-300" : "text-slate-500"}`} />
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-[10px] uppercase tracking-wider text-slate-500">
+          {label}
+        </span>
+        <span
+          className={`font-mono text-sm font-medium ${accent ? "text-brand-300" : "text-slate-100"}`}
+        >
+          {value}
+        </span>
+      </div>
     </div>
   );
 }

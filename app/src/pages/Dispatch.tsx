@@ -1,14 +1,15 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Plane, Plus, X, Play, Ban, Radio, Users, Mountain } from "lucide-react";
 import type { Aircraft, Dispatch as DispatchT, DispatchStatus } from "@/lib/database.types";
 
-const statusColors: Record<DispatchStatus, string> = {
-  pending: "bg-slate-500/20 text-slate-300",
-  dispatched: "bg-blue-500/20 text-blue-300",
-  flying: "bg-brand-500/20 text-brand-300",
-  completed: "bg-emerald-500/20 text-emerald-300",
-  cancelled: "bg-red-500/20 text-red-300",
+const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: string }> = {
+  pending:    { bg: "bg-slate-500/10 border-slate-500/20",   text: "text-slate-300",   dot: "bg-slate-400" },
+  dispatched: { bg: "bg-blue-500/10 border-blue-500/20",     text: "text-blue-300",    dot: "bg-blue-400" },
+  flying:     { bg: "bg-brand-500/10 border-brand-500/20",   text: "text-brand-300",   dot: "bg-brand-400" },
+  completed:  { bg: "bg-emerald-500/10 border-emerald-500/20", text: "text-emerald-300", dot: "bg-emerald-400" },
+  cancelled:  { bg: "bg-red-500/10 border-red-500/20",       text: "text-red-300",     dot: "bg-red-400" },
 };
 
 export default function DispatchPage() {
@@ -54,14 +55,18 @@ export default function DispatchPage() {
   if (!company) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dispatch</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Dispatch</h1>
+          <p className="text-sm text-slate-400">{dispatches.length} dispatches</p>
+        </div>
         <button
           onClick={() => setShowForm((s) => !s)}
-          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-400"
+          className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 hover:shadow-[0_0_20px_oklch(0.58_0.18_195_/_0.25)]"
         >
-          {showForm ? "Cancel" : "+ New dispatch"}
+          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {showForm ? "Cancel" : "New dispatch"}
         </button>
       </div>
 
@@ -81,72 +86,86 @@ export default function DispatchPage() {
       {loading ? (
         <div className="text-slate-400">Loading...</div>
       ) : dispatches.length === 0 ? (
-        <div className="glass px-5 py-8 text-center text-sm text-slate-400">
-          No dispatches yet. Create one and set it to "flying" before takeoff.
+        <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] py-16 text-center">
+          <Plane className="mb-3 h-8 w-8 text-slate-600" />
+          <div className="text-sm text-slate-400">No dispatches yet. Create one and set it to "flying" before takeoff.</div>
         </div>
       ) : (
         <div className="space-y-3">
-          {dispatches.map((d) => (
-            <div key={d.id} className="glass px-5 py-4">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-lg font-semibold text-slate-100">
-                      {d.flight_number}
-                    </span>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusColors[d.status]}`}
-                    >
-                      {d.status}
-                    </span>
+          {dispatches.map((d) => {
+            const cfg = statusConfig[d.status];
+            return (
+              <div
+                key={d.id}
+                className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 transition-all hover:bg-white/[0.03]"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    {/* Flight number + status */}
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-lg font-bold text-white">
+                        {d.flight_number}
+                      </span>
+                      <span
+                        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${cfg.bg} ${cfg.text}`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot} ${d.status === "flying" ? "animate-pulse" : ""}`} />
+                        {d.status}
+                      </span>
+                    </div>
+
+                    {/* Route visualization */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2.5 font-mono text-sm">
+                        <span className="font-semibold text-white">{d.origin_icao}</span>
+                        <div className="flex items-center gap-1">
+                          <div className="h-px w-8 bg-gradient-to-r from-brand-500/60 to-brand-500/20" />
+                          <Plane className="h-3.5 w-3.5 text-brand-400 -rotate-45" />
+                          <div className="h-px w-8 bg-gradient-to-l from-brand-500/60 to-brand-500/20" />
+                        </div>
+                        <span className="font-semibold text-white">{d.dest_icao}</span>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        <span className="font-mono">{d.icao_type}</span>
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {d.pax_eco}Y + {d.pax_biz}J
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Mountain className="h-3 w-3" />
+                          FL{(d.cruise_alt / 100).toFixed(0)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-slate-400">
-                    <span className="font-mono">
-                      {d.origin_icao} &rarr; {d.dest_icao}
-                    </span>
-                    <span>{d.icao_type}</span>
-                    <span>
-                      {d.pax_eco}Y + {d.pax_biz}J
-                    </span>
-                    <span>FL{(d.cruise_alt / 100).toFixed(0)}</span>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    {d.status === "pending" && (
+                      <>
+                        <ActionBtn label="Dispatch" icon={Play} onClick={() => void updateStatus(d.id, "dispatched")} />
+                        <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
+                      </>
+                    )}
+                    {d.status === "dispatched" && (
+                      <ActionBtn label="Start flying" icon={Plane} variant="primary" onClick={() => void updateStatus(d.id, "flying")} />
+                    )}
+                    {d.status === "flying" && (
+                      <span className="flex items-center gap-2 text-xs text-brand-300">
+                        <Radio className="h-3.5 w-3.5 animate-pulse" />
+                        In flight
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  {d.status === "pending" && (
-                    <>
-                      <ActionBtn
-                        label="Dispatch"
-                        onClick={() => void updateStatus(d.id, "dispatched")}
-                      />
-                      <ActionBtn
-                        label="Cancel"
-                        variant="danger"
-                        onClick={() => void updateStatus(d.id, "cancelled")}
-                      />
-                    </>
-                  )}
-                  {d.status === "dispatched" && (
-                    <ActionBtn
-                      label="Start flying"
-                      variant="primary"
-                      onClick={() => void updateStatus(d.id, "flying")}
-                    />
-                  )}
-                  {d.status === "flying" && (
-                    <span className="flex items-center gap-1.5 text-xs text-brand-300">
-                      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-brand-400" />
-                      In flight
-                    </span>
-                  )}
+                <div className="mt-2 text-[11px] text-slate-600">
+                  Created {new Date(d.created_at).toLocaleString()}
                 </div>
               </div>
-
-              <div className="mt-2 text-[11px] text-slate-600">
-                Created {new Date(d.created_at).toLocaleString()}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -157,21 +176,26 @@ export default function DispatchPage() {
 
 function ActionBtn({
   label,
+  icon: Icon,
   onClick,
   variant = "default",
 }: {
   label: string;
+  icon: typeof Play;
   onClick: () => void;
   variant?: "default" | "primary" | "danger";
 }) {
-  const base = "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors";
   const variants = {
-    default: "border border-white/10 text-slate-300 hover:border-white/20 hover:text-white",
-    primary: "bg-brand-500 text-white hover:bg-brand-400",
-    danger: "border border-red-500/30 text-red-400 hover:bg-red-500/10",
+    default: "border border-white/[0.08] text-slate-300 hover:border-white/[0.15] hover:text-white",
+    primary: "bg-brand-500 text-white hover:bg-brand-400 hover:shadow-[0_0_16px_oklch(0.58_0.18_195_/_0.2)]",
+    danger: "border border-red-500/20 text-red-400 hover:bg-red-500/[0.06]",
   };
   return (
-    <button onClick={onClick} className={`${base} ${variants[variant]}`}>
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${variants[variant]}`}
+    >
+      <Icon className="h-3.5 w-3.5" />
       {label}
     </button>
   );
@@ -203,7 +227,6 @@ function NewDispatchForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Auto-fill icao_type when aircraft changes
   const onAircraftChange = (id: string) => {
     setAircraftId(id);
     const ac = aircraft.find((a) => a.id === id);
@@ -240,72 +263,42 @@ function NewDispatchForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="glass space-y-4 px-5 py-4">
-      <h2 className="text-[10px] uppercase tracking-wider text-slate-500">New dispatch</h2>
+    <form onSubmit={onSubmit} className="rounded-xl border border-brand-500/20 bg-brand-500/[0.03] p-5 space-y-4 animate-slide-up">
+      <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">New dispatch</h2>
 
       <div className="grid grid-cols-3 gap-4">
-        <Field
-          label="Flight number"
-          value={flightNumber}
-          onChange={(v) => setFlightNumber(v.toUpperCase())}
-          placeholder={`${airlineCode}001`}
-          required
-        />
-        <Field
-          label="Origin (ICAO)"
-          value={originIcao}
-          onChange={(v) => setOriginIcao(v.toUpperCase())}
-          placeholder="LFPG"
-          required
-        />
-        <Field
-          label="Destination (ICAO)"
-          value={destIcao}
-          onChange={(v) => setDestIcao(v.toUpperCase())}
-          placeholder="KJFK"
-          required
-        />
+        <Field label="Flight number" value={flightNumber} onChange={(v) => setFlightNumber(v.toUpperCase())} placeholder={`${airlineCode}001`} required />
+        <Field label="Origin (ICAO)" value={originIcao} onChange={(v) => setOriginIcao(v.toUpperCase())} placeholder="LFPG" required />
+        <Field label="Destination (ICAO)" value={destIcao} onChange={(v) => setDestIcao(v.toUpperCase())} placeholder="KJFK" required />
       </div>
 
       <div className="grid grid-cols-4 gap-4">
         <label className="block">
-          <span className="mb-1 block text-[10px] uppercase tracking-wider text-slate-400">
-            Aircraft
-          </span>
+          <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">Aircraft</span>
           <select
             value={aircraftId}
             onChange={(e) => onAircraftChange(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-400"
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-brand-400/50"
           >
             <option value="">None</option>
             {aircraft.map((ac) => (
-              <option key={ac.id} value={ac.id}>
-                {ac.name} ({ac.icao_type})
-              </option>
+              <option key={ac.id} value={ac.id}>{ac.name} ({ac.icao_type})</option>
             ))}
           </select>
         </label>
         <Field label="Pax economy" value={paxEco} onChange={setPaxEco} type="number" required />
         <Field label="Pax business" value={paxBiz} onChange={setPaxBiz} type="number" required />
-        <Field
-          label="Cruise alt (ft)"
-          value={cruiseAlt}
-          onChange={setCruiseAlt}
-          type="number"
-          required
-        />
+        <Field label="Cruise alt (ft)" value={cruiseAlt} onChange={setCruiseAlt} type="number" required />
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-          {error}
-        </div>
+        <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-2.5 text-xs text-red-300">{error}</div>
       )}
 
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-lg bg-brand-500 px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-400 disabled:opacity-50"
+        className="rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:opacity-50"
       >
         {submitting ? "Creating..." : "Create dispatch"}
       </button>
@@ -332,16 +325,14 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[10px] uppercase tracking-wider text-slate-400">
-        {label}
-      </span>
+      <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">{label}</span>
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         required={required}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-400"
+        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-brand-400/50"
       />
     </label>
   );

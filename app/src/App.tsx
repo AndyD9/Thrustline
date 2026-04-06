@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Layout } from "@/components/Layout";
+import { Plane } from "lucide-react";
 import Auth from "@/pages/Auth";
 import Onboarding from "@/pages/Onboarding";
 import Dashboard from "@/pages/Dashboard";
@@ -14,8 +15,11 @@ import Settings from "@/pages/Settings";
 
 function LoadingScreen({ label }: { label: string }) {
   return (
-    <div className="flex h-screen w-screen items-center justify-center text-sm text-slate-400">
-      {label}
+    <div className="flex h-screen w-screen flex-col items-center justify-center gap-4">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/15 glow-brand-sm">
+        <Plane className="h-6 w-6 text-brand-300 animate-pulse" />
+      </div>
+      <span className="text-sm text-slate-400">{label}</span>
     </div>
   );
 }

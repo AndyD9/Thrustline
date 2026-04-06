@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import type { Transaction, TransactionType, Loan } from "@/lib/database.types";
 
 const currency = (n: number) =>
@@ -19,15 +30,15 @@ const typeLabels: Record<TransactionType, string> = {
 };
 
 const typeColors: Record<TransactionType, string> = {
-  revenue: "text-emerald-300",
-  fuel: "text-red-300",
-  landing_fee: "text-red-300",
-  lease: "text-red-300",
-  maintenance: "text-red-300",
-  salary: "text-red-300",
-  purchase: "text-red-300",
-  sale: "text-emerald-300",
-  loan_payment: "text-red-300",
+  revenue: "text-emerald-400",
+  fuel: "text-red-400",
+  landing_fee: "text-red-400",
+  lease: "text-red-400",
+  maintenance: "text-red-400",
+  salary: "text-red-400",
+  purchase: "text-red-400",
+  sale: "text-emerald-400",
+  loan_payment: "text-red-400",
 };
 
 export default function Finances() {
@@ -61,7 +72,6 @@ export default function Finances() {
 
   if (!company) return null;
 
-  // Aggregate P&L from loaded transactions
   const totals = transactions.reduce(
     (acc, tx) => {
       if (tx.amount > 0) acc.income += tx.amount;
@@ -71,71 +81,104 @@ export default function Finances() {
     { income: 0, expenses: 0 },
   );
 
+  // Cashflow chart — running balance over last N transactions (chronological)
+  const cashflowData = [...transactions]
+    .reverse()
+    .reduce<{ name: string; balance: number }[]>((arr, tx) => {
+      const prev = arr.length > 0 ? arr[arr.length - 1].balance : company.capital - totals.income + totals.expenses;
+      arr.push({
+        name: new Date(tx.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        balance: prev + tx.amount,
+      });
+      return arr;
+    }, [])
+    .slice(-20);
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Finances</h1>
+    <div className="space-y-6 animate-fade-in">
+      <h1 className="text-2xl font-bold text-white">Finances</h1>
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <SummaryCard label="Capital" value={currency(company.capital)} accent />
-        <SummaryCard label="Total income" value={currency(totals.income)} color="text-emerald-300" />
-        <SummaryCard label="Total expenses" value={currency(totals.expenses)} color="text-red-300" />
-        <SummaryCard
+        <FinCard label="Capital" value={currency(company.capital)} icon={DollarSign} iconColor="text-brand-300" glow />
+        <FinCard label="Total income" value={currency(totals.income)} icon={TrendingUp} iconColor="text-emerald-400" />
+        <FinCard label="Total expenses" value={currency(totals.expenses)} icon={TrendingDown} iconColor="text-red-400" />
+        <FinCard
           label="Net profit"
           value={currency(totals.income - totals.expenses)}
-          color={totals.income - totals.expenses >= 0 ? "text-emerald-300" : "text-red-300"}
+          icon={CreditCard}
+          iconColor={totals.income - totals.expenses >= 0 ? "text-emerald-400" : "text-red-400"}
         />
       </div>
+
+      {/* Cashflow chart */}
+      {cashflowData.length > 2 && (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+          <div className="mb-4 text-[10px] uppercase tracking-[0.15em] text-slate-500">Cashflow over time</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={cashflowData}>
+              <defs>
+                <linearGradient id="gradCashflow" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="oklch(0.58 0.18 195)" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="oklch(0.58 0.18 195)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip
+                contentStyle={{
+                  background: "rgba(10, 16, 24, 0.95)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "0.75rem",
+                  fontSize: 12,
+                }}
+                formatter={(value: number) => [currency(value), "Balance"]}
+              />
+              <Area
+                type="monotone"
+                dataKey="balance"
+                stroke="oklch(0.66 0.18 195)"
+                strokeWidth={2}
+                fill="url(#gradCashflow)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Loans */}
       {loans.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Loans</h2>
+          <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+            <Landmark className="h-5 w-5 text-slate-400" /> Loans
+          </h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {loans.map((loan) => {
-              const progress = loan.total_months > 0
-                ? (loan.paid_months / loan.total_months) * 100
-                : 0;
+              const progress = loan.total_months > 0 ? (loan.paid_months / loan.total_months) * 100 : 0;
               return (
-                <div key={loan.id} className="glass space-y-3 px-5 py-4">
+                <div key={loan.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-slate-200">
-                      {currency(loan.principal)} loan
+                    <div className="text-sm font-semibold text-white">{currency(loan.principal)} loan</div>
+                    <div className="rounded-full bg-white/[0.05] px-2 py-0.5 text-xs text-slate-400">{loan.interest_rate}% APR</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-lg bg-white/[0.03] px-3 py-2 text-center">
+                      <div className="text-[10px] uppercase tracking-wider text-slate-500">Monthly</div>
+                      <div className="mt-0.5 font-mono text-sm text-white">{currency(loan.monthly_payment)}</div>
                     </div>
-                    <div className="text-xs text-slate-400">
-                      {loan.interest_rate}% APR
+                    <div className="rounded-lg bg-white/[0.03] px-3 py-2 text-center">
+                      <div className="text-[10px] uppercase tracking-wider text-slate-500">Remaining</div>
+                      <div className="mt-0.5 font-mono text-sm text-white">{currency(loan.remaining_amount)}</div>
+                    </div>
+                    <div className="rounded-lg bg-white/[0.03] px-3 py-2 text-center">
+                      <div className="text-[10px] uppercase tracking-wider text-slate-500">Payments</div>
+                      <div className="mt-0.5 font-mono text-sm text-white">{loan.paid_months}/{loan.total_months}</div>
                     </div>
                   </div>
-                  <dl className="grid grid-cols-3 gap-2 text-center text-xs">
-                    <div>
-                      <dt className="text-[10px] uppercase tracking-wider text-slate-500">
-                        Monthly
-                      </dt>
-                      <dd className="font-mono text-slate-200">
-                        {currency(loan.monthly_payment)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-[10px] uppercase tracking-wider text-slate-500">
-                        Remaining
-                      </dt>
-                      <dd className="font-mono text-slate-200">
-                        {currency(loan.remaining_amount)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-[10px] uppercase tracking-wider text-slate-500">
-                        Payments
-                      </dt>
-                      <dd className="font-mono text-slate-200">
-                        {loan.paid_months}/{loan.total_months}
-                      </dd>
-                    </div>
-                  </dl>
-                  {/* Progress bar */}
-                  <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                  <div className="h-2 overflow-hidden rounded-full bg-white/[0.04]">
                     <div
-                      className="h-full rounded-full bg-brand-400 transition-all"
+                      className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-400 shadow-[0_0_8px_oklch(0.58_0.18_195_/_0.3)] transition-all"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -148,47 +191,38 @@ export default function Finances() {
 
       {/* Transaction ledger */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Transaction ledger</h2>
+        <h2 className="text-lg font-bold text-white">Transaction ledger</h2>
 
         {loading ? (
           <div className="text-slate-400">Loading...</div>
         ) : transactions.length === 0 ? (
-          <div className="glass px-5 py-8 text-center text-sm text-slate-400">
-            No transactions yet. Complete a flight to generate revenue.
+          <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] py-16 text-center">
+            <DollarSign className="mb-3 h-8 w-8 text-slate-600" />
+            <div className="text-sm text-slate-400">No transactions yet. Complete a flight to generate revenue.</div>
           </div>
         ) : (
-          <div className="glass overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-white/5 text-[10px] uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 text-left">Date</th>
-                  <th className="px-4 py-3 text-left">Type</th>
-                  <th className="px-4 py-3 text-left">Description</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="border-t border-white/5">
-                    <td className="px-4 py-3 text-[11px] text-slate-500">
-                      {new Date(tx.created_at).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-300">
-                        {typeLabels[tx.type]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">{tx.description}</td>
-                    <td
-                      className={`px-4 py-3 text-right font-mono ${typeColors[tx.type]}`}
-                    >
-                      {tx.amount >= 0 ? "+" : ""}
-                      {currency(tx.amount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-1.5">
+            {transactions.map((tx) => (
+              <div
+                key={tx.id}
+                className="flex items-center justify-between rounded-xl border border-white/[0.04] bg-white/[0.02] px-5 py-3 transition-all hover:bg-white/[0.03]"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="rounded-lg bg-white/[0.04] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-300">
+                    {typeLabels[tx.type]}
+                  </span>
+                  <span className="text-sm text-slate-300">{tx.description}</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className={`font-mono text-sm font-semibold ${typeColors[tx.type]}`}>
+                    {tx.amount >= 0 ? "+" : ""}{currency(tx.amount)}
+                  </span>
+                  <span className="text-[11px] text-slate-600">
+                    {new Date(tx.created_at).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -196,27 +230,30 @@ export default function Finances() {
   );
 }
 
-/* ---------- Summary Card ---------- */
+/* ---------- Finance Card ---------- */
 
-function SummaryCard({
+function FinCard({
   label,
   value,
-  accent,
-  color,
+  icon: Icon,
+  iconColor = "text-brand-300",
+  glow,
 }: {
   label: string;
   value: string;
-  accent?: boolean;
-  color?: string;
+  icon: LucideIcon;
+  iconColor?: string;
+  glow?: boolean;
 }) {
   return (
-    <div className="glass px-5 py-4">
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
-      <div
-        className={`mt-1 text-xl font-semibold ${accent ? "text-brand-300" : color ?? "text-slate-100"}`}
-      >
-        {value}
+    <div className={`rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 transition-all hover:bg-white/[0.04] ${glow ? "glow-brand-sm" : ""}`}>
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-[0.15em] text-slate-500">{label}</span>
+        <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] ${iconColor}`}>
+          <Icon className="h-4 w-4" />
+        </div>
       </div>
+      <div className="text-xl font-bold text-white">{value}</div>
     </div>
   );
 }
