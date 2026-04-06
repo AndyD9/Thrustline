@@ -26,7 +26,7 @@ import {
   Bar,
 } from "recharts";
 import type { Flight, Transaction } from "@/lib/database.types";
-import FlightMap from "@/components/FlightMap";
+import FlightMap, { type RouteArc } from "@/components/FlightMap";
 import { airportByIcao } from "@/data/airports";
 
 const currency = (n: number) =>
@@ -148,16 +148,34 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Flight Map */}
+      {/* Flight Network Map — shows all flown routes as arcs */}
       <FlightMap
         origin={company.hub_icao ? airportByIcao[company.hub_icao] : undefined}
+        routes={recentFlights.reduce<RouteArc[]>((acc, f) => {
+          const dep = airportByIcao[f.departure_icao];
+          const arr = airportByIcao[f.arrival_icao];
+          if (dep && arr) {
+            // Deduplicate: only add if this route pair isn't already in the list
+            const key = `${f.departure_icao}-${f.arrival_icao}`;
+            const reverseKey = `${f.arrival_icao}-${f.departure_icao}`;
+            if (!acc.some((r) => `${r.fromIcao}-${r.toIcao}` === key || `${r.fromIcao}-${r.toIcao}` === reverseKey)) {
+              acc.push({
+                from: [dep.lat, dep.lon],
+                to: [arr.lat, arr.lon],
+                fromIcao: f.departure_icao,
+                toIcao: f.arrival_icao,
+              });
+            }
+          }
+          return acc;
+        }, [])}
         aircraft={
           latest && !latest.onGround
             ? { lat: latest.latitude, lon: latest.longitude, heading: latest.headingDeg }
             : undefined
         }
-        height="260px"
-        interactive={false}
+        height="300px"
+        interactive
       />
 
       {/* Last landing */}
