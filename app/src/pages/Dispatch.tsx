@@ -284,6 +284,7 @@ function NewDispatchForm({
 
   const [originIcao, setOriginIcao] = useState("");
   const [destIcao, setDestIcao] = useState("");
+  const [repScore, setRepScore] = useState(50);
   const [aircraftId, setAircraftId] = useState(aircraft[0]?.id ?? "");
   const [icaoType, setIcaoType] = useState(aircraft[0]?.icao_type ?? "");
   const [paxEco, setPaxEco] = useState("160");
@@ -311,9 +312,22 @@ function NewDispatchForm({
   const cruiseSpeed = acType?.cruiseSpeedKts ?? 450;
   const outOfRange = routeDistanceNm !== null && acType && routeDistanceNm > acType.rangeNm;
 
+  // Fetch reputation for this route
+  useEffect(() => {
+    if (!originIcao || !destIcao) { setRepScore(50); return; }
+    supabase
+      .from("reputations")
+      .select("score")
+      .eq("company_id", companyId)
+      .eq("origin_icao", originIcao)
+      .eq("dest_icao", destIcao)
+      .maybeSingle()
+      .then(({ data }) => setRepScore(data?.score ?? 50));
+  }, [originIcao, destIcao, companyId]);
+
   // Dynamic pax demand
   const demand = originApt && destApt && acType && routeDistanceNm
-    ? computePaxDemand({ origin: originApt, dest: destApt, aircraftType: acType, distanceNm: routeDistanceNm })
+    ? computePaxDemand({ origin: originApt, dest: destApt, aircraftType: acType, distanceNm: routeDistanceNm, reputationScore: repScore })
     : null;
 
   // Auto-fill pax from dynamic demand (or fallback to max)
@@ -446,6 +460,10 @@ function NewDispatchForm({
           Demand: {Math.round(demand.loadFactor * 100)}% load factor
           <span className="text-slate-600">·</span>
           <span className="text-slate-400">{demand.eco}/{acType?.maxPaxEco} eco · {demand.biz}/{acType?.maxPaxBiz} biz</span>
+          <span className="text-slate-600">·</span>
+          <span className={repScore >= 70 ? "text-emerald-400" : repScore >= 40 ? "text-amber-400" : "text-red-400"}>
+            Rep: {repScore}/100 ({(0.5 + repScore / 100).toFixed(1)}x)
+          </span>
         </div>
       )}
       <div className="grid grid-cols-3 gap-4">

@@ -12,6 +12,7 @@ import {
   Fuel,
   Clock,
   Route,
+  Star,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -25,7 +26,7 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import type { Flight, Transaction } from "@/lib/database.types";
+import type { Flight, Transaction, Reputation } from "@/lib/database.types";
 import FlightMap, { type RouteArc } from "@/components/FlightMap";
 import { airportByIcao } from "@/data/airports";
 
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const { fmt: u } = useUnits();
   const [recentFlights, setRecentFlights] = useState<Flight[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [reputations, setReputations] = useState<Reputation[]>([]);
 
   useEffect(() => {
     if (!company) return;
@@ -55,9 +57,15 @@ export default function Dashboard() {
         .eq("company_id", company.id)
         .order("created_at", { ascending: false })
         .limit(50),
-    ]).then(([flightsRes, txRes]) => {
+      supabase
+        .from("reputations")
+        .select("*")
+        .eq("company_id", company.id)
+        .order("score", { ascending: false }),
+    ]).then(([flightsRes, txRes, repRes]) => {
       setRecentFlights((flightsRes.data as Flight[]) ?? []);
       setTransactions((txRes.data as Transaction[]) ?? []);
+      setReputations((repRes.data as Reputation[]) ?? []);
     });
   }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -249,6 +257,60 @@ export default function Dashboard() {
                 <Bar dataKey="value" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Route Reputation */}
+      {reputations.length > 0 && (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.15em] text-slate-500">
+              <Star className="h-3.5 w-3.5" /> Route reputation
+            </span>
+            <span className="text-[10px] text-slate-500">{reputations.length} routes</span>
+          </div>
+          <div className="space-y-2">
+            {reputations.slice(0, 8).map((r) => {
+              const mult = (0.5 + r.score / 100).toFixed(1);
+              const isPremium = r.score >= 80;
+              return (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.01] px-4 py-2.5 transition-colors hover:bg-white/[0.03]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 font-mono text-sm">
+                      <span className="font-semibold text-white">{r.origin_icao}</span>
+                      <span className="text-slate-600">{"\u2192"}</span>
+                      <span className="font-semibold text-white">{r.dest_icao}</span>
+                    </div>
+                    <span className="text-xs text-slate-500">{r.flight_count} flight{r.flight_count !== 1 ? "s" : ""}</span>
+                    {isPremium && (
+                      <span className="flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                        <Star className="h-2.5 w-2.5" /> Premium
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`font-mono text-sm font-semibold ${
+                      r.score >= 70 ? "text-emerald-400" : r.score >= 40 ? "text-amber-400" : "text-red-400"
+                    }`}>
+                      {r.score.toFixed(0)}/100
+                    </span>
+                    <span className="text-xs text-slate-500">{mult}x</span>
+                    <div className="w-20 h-1.5 overflow-hidden rounded-full bg-white/[0.04]">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          r.score >= 70 ? "bg-emerald-400" : r.score >= 40 ? "bg-amber-400" : "bg-red-400"
+                        }`}
+                        style={{ width: `${r.score}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
