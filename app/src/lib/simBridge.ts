@@ -53,8 +53,8 @@ export async function startMockFlight(params: {
   cruiseAltFt: number;
   cruiseSpeedKts: number;
   fuelGal: number;
-  heading: number;
   durationSeconds: number;
+  waypoints?: { lat: number; lon: number }[];
 }): Promise<void> {
   try {
     await fetch(`${BASE_URL}/mock/start-flight`, {

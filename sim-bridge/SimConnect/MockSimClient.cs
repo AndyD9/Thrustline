@@ -5,7 +5,7 @@ namespace Thrustline.Bridge.SimConnect;
 /// <summary>
 /// Mock SimClient : simule un vol à la demande pour le dev sans MSFS / macOS.
 /// Reste idle (au sol) jusqu'à l'appel de <see cref="StartFlight"/>, puis
-/// simule un vol complet origin → destination avec les paramètres du dispatch.
+/// simule un vol complet en suivant les waypoints du plan de vol.
 /// Émet un SimData à 1 Hz.
 /// </summary>
 public class MockSimClient : ISimClient
@@ -16,7 +16,6 @@ public class MockSimClient : ISimClient
     private CancellationTokenSource? _cts;
     private Task? _loop;
 
-    // Flight parameters — set by StartFlight()
     private MockFlightPlan? _plan;
     private readonly object _planLock = new();
 
@@ -34,7 +33,6 @@ public class MockSimClient : ISimClient
 
     /// <summary>
     /// Start a simulated flight with the given parameters.
-    /// Called from POST /mock/start-flight endpoint.
     /// </summary>
     public void StartFlight(MockFlightPlan plan)
     {
@@ -43,8 +41,8 @@ public class MockSimClient : ISimClient
             _plan = plan;
             _clock.Restart();
         }
-        _log.LogInformation("Mock flight started: {Origin} → {Dest} ({Type}), duration {Dur}s",
-            plan.OriginIcao, plan.DestIcao, plan.IcaoType, plan.DurationSeconds);
+        _log.LogInformation("Mock flight started: {Origin} → {Dest} ({Type}), {Wpts} waypoints, duration {Dur}s",
+            plan.OriginIcao, plan.DestIcao, plan.IcaoType, plan.Waypoints.Count, plan.DurationSeconds);
     }
 
     public Task StartAsync(CancellationToken ct)
@@ -93,7 +91,6 @@ public class MockSimClient : ISimClient
         MockFlightPlan? plan;
         lock (_planLock) { plan = _plan; }
 
-        // No flight active → idle on ground at origin (or 0,0 if no plan ever set)
         if (plan == null)
         {
             return new SimData
@@ -109,12 +106,14 @@ public class MockSimClient : ISimClient
         var elapsed = _clock.Elapsed.TotalSeconds;
         var dur = plan.DurationSeconds;
 
+        // Build the full route path: origin → waypoints → destination
+        var route = plan.BuildRoute();
+
         // Phases: ground(10%) → takeoff(10%) → cruise(60%) → descent(15%) → touchdown(5%)
         var groundEnd = dur * 0.10;
         var takeoffEnd = dur * 0.20;
         var cruiseEnd = dur * 0.80;
         var descentEnd = dur * 0.95;
-        // after descentEnd → on ground at destination
 
         bool onGround;
         double alt, gs, ias, vs, fuel;
@@ -122,44 +121,40 @@ public class MockSimClient : ISimClient
 
         var cruiseAlt = plan.CruiseAltFt;
         var startFuel = plan.FuelGal;
-        hdg = plan.Heading;
 
         if (elapsed < groundEnd)
         {
-            // On ground at origin
             onGround = true;
             alt = plan.OriginElevFt;
             gs = 0; ias = 0; vs = 0;
             fuel = startFuel;
             lat = plan.OriginLat; lon = plan.OriginLon;
+            hdg = route.Count >= 2 ? Bearing(route[0].Lat, route[0].Lon, route[1].Lat, route[1].Lon) : 0;
         }
         else if (elapsed < takeoffEnd)
         {
-            // Takeoff phase
             var p = (elapsed - groundEnd) / (takeoffEnd - groundEnd);
             onGround = p < 0.4;
             alt = plan.OriginElevFt + p * Math.Min(8000, cruiseAlt * 0.25);
             gs = p * 200; ias = p * 180;
             vs = 2200;
-            fuel = startFuel - p * (startFuel * 0.02); // burn 2% during takeoff
-            lat = Lerp(plan.OriginLat, plan.DestLat, 0.01 * p);
-            lon = Lerp(plan.OriginLon, plan.DestLon, 0.01 * p);
+            fuel = startFuel - p * (startFuel * 0.02);
+            var routeP = p * 0.01; // first 1% of route
+            (lat, lon, hdg) = InterpolateRoute(route, routeP);
         }
         else if (elapsed < cruiseEnd)
         {
-            // Cruise
             var p = (elapsed - takeoffEnd) / (cruiseEnd - takeoffEnd);
             onGround = false;
             alt = cruiseAlt;
-            gs = plan.CruiseSpeedKts; ias = plan.CruiseSpeedKts * 0.61; // rough IAS at FL350
+            gs = plan.CruiseSpeedKts; ias = plan.CruiseSpeedKts * 0.61;
             vs = 0;
-            fuel = startFuel * 0.98 - p * (startFuel * 0.50); // burn 50% during cruise
-            lat = Lerp(plan.OriginLat, plan.DestLat, 0.01 + 0.98 * p);
-            lon = Lerp(plan.OriginLon, plan.DestLon, 0.01 + 0.98 * p);
+            fuel = startFuel * 0.98 - p * (startFuel * 0.50);
+            var routeP = 0.01 + 0.98 * p; // 1% to 99% of route
+            (lat, lon, hdg) = InterpolateRoute(route, routeP);
         }
         else if (elapsed < descentEnd)
         {
-            // Descent
             var p = (elapsed - cruiseEnd) / (descentEnd - cruiseEnd);
             onGround = false;
             alt = cruiseAlt * (1 - p) + plan.DestElevFt * p;
@@ -167,19 +162,18 @@ public class MockSimClient : ISimClient
             ias = gs * 0.61;
             vs = -1800;
             fuel = startFuel * 0.48 - p * (startFuel * 0.02);
-            lat = Lerp(plan.OriginLat, plan.DestLat, 0.99 + 0.01 * p);
-            lon = Lerp(plan.OriginLon, plan.DestLon, 0.99 + 0.01 * p);
+            var routeP = 0.99 + 0.01 * p; // last 1% of route
+            (lat, lon, hdg) = InterpolateRoute(route, routeP);
         }
         else
         {
-            // Touchdown at destination — stay here until next StartFlight
             onGround = true;
             alt = plan.DestElevFt;
             gs = 0; ias = 0; vs = -220;
             fuel = startFuel * 0.46;
             lat = plan.DestLat; lon = plan.DestLon;
+            hdg = route.Count >= 2 ? Bearing(route[^2].Lat, route[^2].Lon, route[^1].Lat, route[^1].Lon) : 0;
 
-            // Clear plan after a few seconds on ground so we go back to idle
             if (elapsed > descentEnd + 10)
             {
                 lock (_planLock) { _plan = null; }
@@ -201,7 +195,70 @@ public class MockSimClient : ISimClient
         };
     }
 
-    private static double Lerp(double a, double b, double t) => a + (b - a) * t;
+    /// <summary>
+    /// Interpolate position along a route of waypoints.
+    /// <paramref name="t"/> is 0..1 along the total route distance.
+    /// Returns (lat, lon, heading).
+    /// </summary>
+    private static (double Lat, double Lon, double Hdg) InterpolateRoute(List<LatLon> route, double t)
+    {
+        if (route.Count < 2)
+            return (route[0].Lat, route[0].Lon, 0);
+
+        t = Math.Clamp(t, 0, 1);
+
+        // Compute cumulative segment distances
+        var segDists = new double[route.Count - 1];
+        double totalDist = 0;
+        for (int i = 0; i < route.Count - 1; i++)
+        {
+            segDists[i] = HaversineNm(route[i].Lat, route[i].Lon, route[i + 1].Lat, route[i + 1].Lon);
+            totalDist += segDists[i];
+        }
+
+        if (totalDist < 0.001)
+            return (route[0].Lat, route[0].Lon, 0);
+
+        var targetDist = t * totalDist;
+        double accumulated = 0;
+
+        for (int i = 0; i < segDists.Length; i++)
+        {
+            if (accumulated + segDists[i] >= targetDist || i == segDists.Length - 1)
+            {
+                var segT = segDists[i] > 0.001 ? (targetDist - accumulated) / segDists[i] : 0;
+                segT = Math.Clamp(segT, 0, 1);
+                var lat = route[i].Lat + (route[i + 1].Lat - route[i].Lat) * segT;
+                var lon = route[i].Lon + (route[i + 1].Lon - route[i].Lon) * segT;
+                var hdg = Bearing(route[i].Lat, route[i].Lon, route[i + 1].Lat, route[i + 1].Lon);
+                return (lat, lon, hdg);
+            }
+            accumulated += segDists[i];
+        }
+
+        return (route[^1].Lat, route[^1].Lon, 0);
+    }
+
+    /// <summary>Initial bearing from point A to point B in degrees (0-360).</summary>
+    private static double Bearing(double lat1, double lon1, double lat2, double lon2)
+    {
+        var dLon = (lon2 - lon1) * Math.PI / 180;
+        var y = Math.Sin(dLon) * Math.Cos(lat2 * Math.PI / 180);
+        var x = Math.Cos(lat1 * Math.PI / 180) * Math.Sin(lat2 * Math.PI / 180)
+              - Math.Sin(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) * Math.Cos(dLon);
+        return (Math.Atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
+    private static double HaversineNm(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 3440.065;
+        var dLat = (lat2 - lat1) * Math.PI / 180;
+        var dLon = (lon2 - lon1) * Math.PI / 180;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+              + Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180)
+              * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        return 2 * R * Math.Asin(Math.Sqrt(a));
+    }
 
     private void SetConnected(bool value)
     {
@@ -210,6 +267,8 @@ public class MockSimClient : ISimClient
         ConnectionChanged?.Invoke(this, value);
     }
 }
+
+public record LatLon(double Lat, double Lon);
 
 /// <summary>
 /// Parameters for a mock flight, populated from dispatch data.
@@ -228,7 +287,16 @@ public class MockFlightPlan
     public double CruiseAltFt { get; set; } = 35000;
     public double CruiseSpeedKts { get; set; } = 460;
     public double FuelGal { get; set; } = 5000;
-    public double Heading { get; set; } = 270;
-    /// <summary>Total simulated flight duration in seconds (default 120s for dev).</summary>
     public double DurationSeconds { get; set; } = 120;
+    /// <summary>Waypoints from OFP navlog (lat/lon pairs). If empty, straight line origin→dest.</summary>
+    public List<LatLon> Waypoints { get; set; } = new();
+
+    /// <summary>Build the full route: origin → waypoints → destination.</summary>
+    public List<LatLon> BuildRoute()
+    {
+        var route = new List<LatLon> { new(OriginLat, OriginLon) };
+        route.AddRange(Waypoints);
+        route.Add(new(DestLat, DestLon));
+        return route;
+    }
 }

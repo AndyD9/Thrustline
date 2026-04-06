@@ -168,11 +168,17 @@ export default function DispatchPage() {
                         const dest = airportByIcao[d.dest_icao];
                         const acType = aircraftTypeByIcao[d.icao_type];
                         if (orig && dest) {
-                          const dist = haversineNm(orig.lat, orig.lon, dest.lat, dest.lon);
                           const speed = acType?.cruiseSpeedKts ?? 450;
-                          const dLat = dest.lat - orig.lat;
-                          const dLon = dest.lon - orig.lon;
-                          const hdg = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
+                          // Extract waypoints from OFP if available
+                          let waypoints: { lat: number; lon: number }[] = [];
+                          if (d.ofp_data) {
+                            try {
+                              const ofpParsed = typeof d.ofp_data === "string" ? JSON.parse(d.ofp_data) : d.ofp_data;
+                              if (ofpParsed?.navlog && Array.isArray(ofpParsed.navlog)) {
+                                waypoints = ofpParsed.navlog.map((f: { lat: number; lon: number }) => ({ lat: f.lat, lon: f.lon }));
+                              }
+                            } catch { /* ignore */ }
+                          }
                           await startMockFlight({
                             originIcao: d.origin_icao,
                             destIcao: d.dest_icao,
@@ -186,8 +192,8 @@ export default function DispatchPage() {
                             cruiseAltFt: d.cruise_alt || 35000,
                             cruiseSpeedKts: speed,
                             fuelGal: acType?.fuelCapacityGal ?? 5000,
-                            heading: hdg,
-                            durationSeconds: 120, // 2 min mock flight for dev
+                            durationSeconds: 120,
+                            waypoints,
                           });
                         }
                         navigate(`/live-flight?dispatch=${d.id}`);

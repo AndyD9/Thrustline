@@ -104,6 +104,10 @@ if (simBridgeConfig.UseMockSimConnect || !OperatingSystem.IsWindows())
         if (client is not MockSimClient mock)
             return Results.BadRequest(new { error = "Not in mock mode" });
 
+        var waypoints = payload.Waypoints?
+            .Select(w => new LatLon(w.Lat, w.Lon))
+            .ToList() ?? new List<LatLon>();
+
         mock.StartFlight(new MockFlightPlan
         {
             OriginIcao = payload.OriginIcao,
@@ -118,8 +122,8 @@ if (simBridgeConfig.UseMockSimConnect || !OperatingSystem.IsWindows())
             CruiseAltFt = payload.CruiseAltFt,
             CruiseSpeedKts = payload.CruiseSpeedKts,
             FuelGal = payload.FuelGal,
-            Heading = payload.Heading,
             DurationSeconds = payload.DurationSeconds > 0 ? payload.DurationSeconds : 120,
+            Waypoints = waypoints,
         });
         return Results.Ok(new { status = "mock flight started" });
     });
@@ -153,6 +157,8 @@ public class SupabaseOptions
 
 public record SessionPayload(Guid UserId);
 
+public record MockWaypointPayload(double Lat, double Lon);
+
 public record MockFlightPayload(
     string OriginIcao,
     string DestIcao,
@@ -166,6 +172,6 @@ public record MockFlightPayload(
     double CruiseAltFt,
     double CruiseSpeedKts,
     double FuelGal,
-    double Heading,
-    double DurationSeconds
+    double DurationSeconds,
+    List<MockWaypointPayload>? Waypoints
 );
