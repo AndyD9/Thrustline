@@ -132,7 +132,7 @@ export default function FlightMap({
         {routePoints.length >= 2 && (
           <Polyline
             positions={routePoints}
-            pathOptions={{ color: "oklch(0.58 0.18 195)", weight: 2, opacity: 0.6, dashArray: "6 4" }}
+            pathOptions={{ color: "#00b4d8", weight: 2, opacity: 0.7, dashArray: "6 4" }}
           />
         )}
 

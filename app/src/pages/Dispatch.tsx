@@ -12,6 +12,7 @@ import { haversineNm } from "@/lib/geo";
 import { fetchOFP, buildSimbriefUrl, type SimBriefOFP } from "@/lib/simbrief";
 import { startMockFlight } from "@/lib/simBridge";
 import { useUnits } from "@/contexts/UnitsContext";
+import { open as shellOpen } from "@tauri-apps/plugin-shell";
 
 const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: string }> = {
   pending:    { bg: "bg-slate-500/10 border-slate-500/20",   text: "text-slate-300",   dot: "bg-slate-400" },
@@ -403,11 +404,10 @@ function NewDispatchForm({
       </div>
 
       {/* ── Step 3: Load ─────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <FieldWithMax label="Pax economy" value={paxEco} onChange={setPaxEco} type="number" required max={acType?.maxPaxEco} />
         <FieldWithMax label="Pax business" value={paxBiz} onChange={setPaxBiz} type="number" required max={acType?.maxPaxBiz} />
         <Field label="Cargo (kg)" value={cargoKg} onChange={setCargoKg} type="number" />
-        <Field label="Cruise alt (ft)" value={cruiseAlt} onChange={setCruiseAlt} type="number" required />
       </div>
 
       {/* ── Step 4: SimBrief ─────────────────────────── */}
@@ -420,7 +420,7 @@ function NewDispatchForm({
                 setError("Fill origin, destination and aircraft first");
                 return;
               }
-              window.open(buildSimbriefUrl(originIcao, destIcao, icaoType), "_blank");
+              void shellOpen(buildSimbriefUrl(originIcao, destIcao, icaoType));
             }}
             className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-3 py-2 text-xs font-semibold text-slate-300 transition-all hover:border-white/[0.15] hover:text-white"
           >
