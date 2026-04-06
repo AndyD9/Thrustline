@@ -120,6 +120,9 @@ export function buildSimbriefUrl(opts: {
   flightNumber?: string;
   callsign?: string;
   pax?: number;
+  /** SimBrief saved aircraft internal ID — overrides type with exact aircraft profile */
+  simbriefAircraftId?: string | null;
+  registration?: string | null;
 }): string {
   const params = new URLSearchParams({
     orig: opts.origin,
@@ -130,5 +133,7 @@ export function buildSimbriefUrl(opts: {
   if (opts.flightNumber) params.set("fltnum", opts.flightNumber);
   if (opts.callsign) params.set("callsign", opts.callsign);
   if (opts.pax && opts.pax > 0) params.set("pax", String(opts.pax));
+  if (opts.simbriefAircraftId) params.set("acid", opts.simbriefAircraftId);
+  if (opts.registration) params.set("reg", opts.registration);
   return `https://dispatch.simbrief.com/options/custom?${params}`;
 }

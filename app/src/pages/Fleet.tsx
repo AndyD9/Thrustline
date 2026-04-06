@@ -105,7 +105,7 @@ export default function Fleet() {
                     <div>
                       <div className="font-semibold text-white">{ac.name}</div>
                       <div className="font-mono text-xs text-slate-500">
-                        {ac.icao_type} · {ac.ownership}
+                        {ac.icao_type}{ac.registration ? ` · ${ac.registration}` : ""} · {ac.ownership}
                       </div>
                     </div>
                   </div>
@@ -185,7 +185,9 @@ function AddAircraftForm({
   onDone: () => void;
 }) {
   const [name, setName] = useState("");
+  const [registration, setRegistration] = useState("");
   const [icaoType, setIcaoType] = useState("");
+  const [simbriefAircraftId, setSimbriefAircraftId] = useState("");
   const [ownership, setOwnership] = useState<"leased" | "owned">("leased");
   const [leaseCost, setLeaseCost] = useState("50000");
   const [purchasePrice, setPurchasePrice] = useState("0");
@@ -201,7 +203,9 @@ function AddAircraftForm({
         user_id: userId,
         company_id: companyId,
         name: name.trim(),
+        registration: registration.trim().toUpperCase() || null,
         icao_type: icaoType.trim().toUpperCase(),
+        simbrief_aircraft_id: simbriefAircraftId.trim() || null,
         ownership,
         lease_cost_mo: ownership === "leased" ? Number(leaseCost) : 0,
         purchase_price: ownership === "owned" ? Number(purchasePrice) : 0,
@@ -222,14 +226,16 @@ function AddAircraftForm({
     <form onSubmit={onSubmit} className="rounded-xl border border-brand-500/20 bg-brand-500/[0.03] p-5 space-y-4 animate-slide-up">
       <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">New aircraft</h2>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <Field label="Name" value={name} onChange={setName} placeholder="Thrustline One" required />
+        <Field label="Registration" value={registration} onChange={(v) => setRegistration(v.toUpperCase())} placeholder="F-GKXS" />
         <AircraftTypePicker
           label="ICAO type"
           value={icaoType}
           onChange={(v) => setIcaoType(v)}
           required
         />
+        <Field label="SimBrief Aircraft ID" value={simbriefAircraftId} onChange={setSimbriefAircraftId} placeholder="12345" />
       </div>
 
       <div className="grid grid-cols-3 gap-4">

@@ -70,6 +70,8 @@ export interface Aircraft {
   company_id: string;
   name: string;
   icao_type: string;
+  registration: string | null;
+  simbrief_aircraft_id: string | null;
   health_pct: number;
   lease_cost_mo: number;
   total_hours: number;

@@ -488,6 +488,7 @@ function NewDispatchForm({
                 setError("Fill origin, destination and aircraft first");
                 return;
               }
+              const selectedAc = aircraft.find((a) => a.id === aircraftId);
               void shellOpen(buildSimbriefUrl({
                 origin: originIcao,
                 dest: destIcao,
@@ -496,6 +497,8 @@ function NewDispatchForm({
                 flightNumber: flightNumber.replace(airlineCode, ""),
                 callsign,
                 pax: Number(paxEco) + Number(paxBiz),
+                simbriefAircraftId: selectedAc?.simbrief_aircraft_id,
+                registration: selectedAc?.registration,
               }));
             }}
             className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-3 py-2 text-xs font-semibold text-slate-300 transition-all hover:border-white/[0.15] hover:text-white"
