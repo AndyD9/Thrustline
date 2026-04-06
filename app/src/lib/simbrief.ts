@@ -149,8 +149,12 @@ export async function fetchSimbriefAircraft(
     if (!res.ok) return null;
     const data = await res.json();
 
-    // The OFP response includes aircraft data
+    // Aircraft identification is in data.aircraft
     const ac = data?.aircraft;
+    // Weight limits are in data.weights
+    const wt = data?.weights ?? {};
+    // Fuel data in data.fuel or data.aircraft
+    const fl = data?.fuel ?? {};
     if (!ac) return null;
 
     return {
@@ -158,13 +162,13 @@ export async function fetchSimbriefAircraft(
       icaoType: ac.icaocode ?? ac.icao ?? "",
       name: ac.name ?? "",
       registration: ac.reg ?? "",
-      maxPax: parseInt(ac.max_passengers) || 0,
-      maxCargoKg: parseInt(ac.maxcargo) || parseInt(ac.max_cargo) || 0,
-      maxFuelKg: parseInt(ac.maxfuel) || parseInt(ac.max_fuel) || 0,
-      emptyWeightKg: parseInt(ac.oew) || 0,
-      maxTakeoffKg: parseInt(ac.mtow) || parseInt(ac.max_tow) || 0,
-      maxLandingKg: parseInt(ac.mlw) || parseInt(ac.max_ldw) || 0,
-      maxZeroFuelKg: parseInt(ac.mzfw) || parseInt(ac.max_zfw) || 0,
+      maxPax: parseInt(ac.max_passengers) || parseInt(wt.pax_count) || 0,
+      maxCargoKg: parseInt(wt.max_cargo) || parseInt(ac.maxcargo) || 0,
+      maxFuelKg: parseInt(ac.maxfuel) || parseInt(fl.max_fuel) || 0,
+      emptyWeightKg: parseInt(wt.oew) || parseInt(ac.oew) || 0,
+      maxTakeoffKg: parseInt(wt.max_tow) || parseInt(ac.mtow) || 0,
+      maxLandingKg: parseInt(wt.max_ldw) || parseInt(ac.mlw) || 0,
+      maxZeroFuelKg: parseInt(wt.max_zfw) || parseInt(ac.mzfw) || 0,
       ceilingFt: parseInt(ac.ceiling) || parseInt(ac.service_ceiling) || 0,
       engineType: ac.engines ?? ac.engine_type ?? "",
     };
