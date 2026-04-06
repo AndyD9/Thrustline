@@ -38,7 +38,7 @@ if (simBridgeConfig.UseMockSimConnect || !OperatingSystem.IsWindows())
 }
 else
 {
-#if WINDOWS
+#if HAS_SIMCONNECT
     builder.Services.AddSingleton<ISimClient, NativeSimConnectClient>();
 #else
     builder.Services.AddSingleton<ISimClient, MockSimClient>();

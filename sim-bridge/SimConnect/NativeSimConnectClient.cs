@@ -11,7 +11,7 @@
 //   - Retry connexion toutes les 5s si MSFS n'est pas lancé
 //   - Émet DataReceived à chaque snapshot, ConnectionChanged sur open/quit
 
-#if WINDOWS
+#if HAS_SIMCONNECT
 
 using System.Runtime.InteropServices;
 using Microsoft.FlightSimulator.SimConnect;
