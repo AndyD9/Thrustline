@@ -15,6 +15,8 @@ interface FlightMapProps {
   origin?: Airport;
   destination?: Airport;
   waypoints?: [number, number][];
+  /** Aircraft trail — solid line showing the flown path */
+  trail?: [number, number][];
   aircraft?: { lat: number; lon: number; heading: number };
   height?: string;
   interactive?: boolean;
@@ -94,13 +96,14 @@ export default function FlightMap({
   origin,
   destination,
   waypoints,
+  trail,
   aircraft,
   height = "300px",
   interactive = true,
 }: FlightMapProps) {
   const apIcon = useMemo(() => airportIcon(), []);
 
-  // Build route line
+  // Build planned route line
   const routePoints: [number, number][] = [];
   if (origin) routePoints.push([origin.lat, origin.lon]);
   if (waypoints) routePoints.push(...waypoints);
@@ -128,11 +131,19 @@ export default function FlightMap({
         <TileLayer url={DARK_TILES} attribution={ATTRIBUTION} />
         <FitBounds origin={origin} destination={destination} aircraft={aircraft} />
 
-        {/* Route polyline */}
+        {/* Planned route polyline (dashed) */}
         {routePoints.length >= 2 && (
           <Polyline
             positions={routePoints}
-            pathOptions={{ color: "#00b4d8", weight: 2, opacity: 0.7, dashArray: "6 4" }}
+            pathOptions={{ color: "#00b4d8", weight: 2, opacity: 0.4, dashArray: "6 4" }}
+          />
+        )}
+
+        {/* Flown trail (solid) */}
+        {trail && trail.length >= 2 && (
+          <Polyline
+            positions={trail}
+            pathOptions={{ color: "#00b4d8", weight: 3, opacity: 0.9 }}
           />
         )}
 

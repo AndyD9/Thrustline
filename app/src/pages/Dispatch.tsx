@@ -169,13 +169,18 @@ export default function DispatchPage() {
                         const acType = aircraftTypeByIcao[d.icao_type];
                         if (orig && dest) {
                           const speed = acType?.cruiseSpeedKts ?? 450;
-                          // Extract waypoints from OFP if available
+                          // Extract waypoints from OFP, filtering out points too close to origin/dest
                           let waypoints: { lat: number; lon: number }[] = [];
                           if (d.ofp_data) {
                             try {
                               const ofpParsed = typeof d.ofp_data === "string" ? JSON.parse(d.ofp_data) : d.ofp_data;
                               if (ofpParsed?.navlog && Array.isArray(ofpParsed.navlog)) {
-                                waypoints = ofpParsed.navlog.map((f: { lat: number; lon: number }) => ({ lat: f.lat, lon: f.lon }));
+                                waypoints = ofpParsed.navlog
+                                  .map((f: { lat: number; lon: number }) => ({ lat: f.lat, lon: f.lon }))
+                                  .filter((w: { lat: number; lon: number }) =>
+                                    (Math.abs(w.lat - orig.lat) > 0.05 || Math.abs(w.lon - orig.lon) > 0.05) &&
+                                    (Math.abs(w.lat - dest.lat) > 0.05 || Math.abs(w.lon - dest.lon) > 0.05)
+                                  );
                               }
                             } catch { /* ignore */ }
                           }

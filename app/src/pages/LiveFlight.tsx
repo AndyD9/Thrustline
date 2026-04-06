@@ -51,14 +51,23 @@ export default function LiveFlight() {
         if (!data) return;
         const d = data as Dispatch;
         setDispatch(d);
-        setOrigin(airportByIcao[d.origin_icao]);
-        setDestination(airportByIcao[d.dest_icao]);
-        // Parse OFP waypoints if available
-        if (d.ofp_data) {
+        const orig = airportByIcao[d.origin_icao];
+        const dest = airportByIcao[d.dest_icao];
+        setOrigin(orig);
+        setDestination(dest);
+        // Parse OFP waypoints, filtering out points too close to origin/dest
+        if (d.ofp_data && orig && dest) {
           try {
             const ofp = typeof d.ofp_data === "string" ? JSON.parse(d.ofp_data) : d.ofp_data;
             if (ofp?.navlog && Array.isArray(ofp.navlog)) {
-              setWaypoints(ofp.navlog.map((f: { lat: number; lon: number }) => [f.lat, f.lon]));
+              setWaypoints(
+                ofp.navlog
+                  .map((f: { lat: number; lon: number }) => [f.lat, f.lon] as [number, number])
+                  .filter(([lat, lon]: [number, number]) =>
+                    (Math.abs(lat - orig.lat) > 0.05 || Math.abs(lon - orig.lon) > 0.05) &&
+                    (Math.abs(lat - dest.lat) > 0.05 || Math.abs(lon - dest.lon) > 0.05)
+                  )
+              );
             }
           } catch { /* ignore parse errors */ }
         }
@@ -70,8 +79,8 @@ export default function LiveFlight() {
     if (!latest || latest.onGround) return;
     const last = trailRef.current[trailRef.current.length - 1];
     const pos: [number, number] = [latest.latitude, latest.longitude];
-    // Only add if moved significantly (>0.005 deg ~ 500m)
-    if (!last || Math.abs(last[0] - pos[0]) > 0.005 || Math.abs(last[1] - pos[1]) > 0.005) {
+    // Add every position update (~1Hz) for smooth trail
+    if (!last || Math.abs(last[0] - pos[0]) > 0.001 || Math.abs(last[1] - pos[1]) > 0.001) {
       trailRef.current.push(pos);
       setTrail([...trailRef.current]);
     }
@@ -94,7 +103,8 @@ export default function LiveFlight() {
       <FlightMap
         origin={origin}
         destination={destination}
-        waypoints={waypoints.length > 0 ? waypoints : trail}
+        waypoints={waypoints.length > 0 ? waypoints : undefined}
+        trail={trail.length >= 2 ? trail : undefined}
         aircraft={aircraft}
         height="100%"
         interactive
