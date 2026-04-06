@@ -12,6 +12,7 @@ import { airportByIcao } from "@/data/airports";
 import { aircraftTypeByIcao } from "@/data/aircraftTypes";
 import { haversineNm } from "@/lib/geo";
 import { fetchOFP, buildSimbriefUrl, type SimBriefOFP } from "@/lib/simbrief";
+import { startMockFlight } from "@/lib/simBridge";
 
 const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: string }> = {
   pending:    { bg: "bg-slate-500/10 border-slate-500/20",   text: "text-slate-300",   dot: "bg-slate-400" },
@@ -162,6 +163,33 @@ export default function DispatchPage() {
                     {d.status === "dispatched" && (
                       <ActionBtn label="Start flying" icon={Plane} variant="primary" onClick={async () => {
                         await updateStatus(d.id, "flying");
+                        // Trigger mock flight with dispatch parameters
+                        const orig = airportByIcao[d.origin_icao];
+                        const dest = airportByIcao[d.dest_icao];
+                        const acType = aircraftTypeByIcao[d.icao_type];
+                        if (orig && dest) {
+                          const dist = haversineNm(orig.lat, orig.lon, dest.lat, dest.lon);
+                          const speed = acType?.cruiseSpeedKts ?? 450;
+                          const dLat = dest.lat - orig.lat;
+                          const dLon = dest.lon - orig.lon;
+                          const hdg = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
+                          await startMockFlight({
+                            originIcao: d.origin_icao,
+                            destIcao: d.dest_icao,
+                            icaoType: d.icao_type,
+                            originLat: orig.lat,
+                            originLon: orig.lon,
+                            originElevFt: orig.elevation_ft,
+                            destLat: dest.lat,
+                            destLon: dest.lon,
+                            destElevFt: dest.elevation_ft,
+                            cruiseAltFt: d.cruise_alt || 35000,
+                            cruiseSpeedKts: speed,
+                            fuelGal: acType?.fuelCapacityGal ?? 5000,
+                            heading: hdg,
+                            durationSeconds: 120, // 2 min mock flight for dev
+                          });
+                        }
                         navigate(`/live-flight?dispatch=${d.id}`);
                       }} />
                     )}

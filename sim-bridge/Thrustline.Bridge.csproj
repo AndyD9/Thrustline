@@ -7,6 +7,7 @@
     <RootNamespace>Thrustline.Bridge</RootNamespace>
     <AssemblyName>sim-bridge</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <UserSecretsId>e289fb10-9806-4a52-bbef-50dcfb24d6f9</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

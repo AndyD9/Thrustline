@@ -96,6 +96,35 @@ app.MapDelete("/session", (ISessionStore session) =>
     return Results.NoContent();
 });
 
+// --- Mock flight trigger (only in mock mode) ---
+if (simBridgeConfig.UseMockSimConnect || !OperatingSystem.IsWindows())
+{
+    app.MapPost("/mock/start-flight", (MockFlightPayload payload, ISimClient client) =>
+    {
+        if (client is not MockSimClient mock)
+            return Results.BadRequest(new { error = "Not in mock mode" });
+
+        mock.StartFlight(new MockFlightPlan
+        {
+            OriginIcao = payload.OriginIcao,
+            DestIcao = payload.DestIcao,
+            IcaoType = payload.IcaoType,
+            OriginLat = payload.OriginLat,
+            OriginLon = payload.OriginLon,
+            OriginElevFt = payload.OriginElevFt,
+            DestLat = payload.DestLat,
+            DestLon = payload.DestLon,
+            DestElevFt = payload.DestElevFt,
+            CruiseAltFt = payload.CruiseAltFt,
+            CruiseSpeedKts = payload.CruiseSpeedKts,
+            FuelGal = payload.FuelGal,
+            Heading = payload.Heading,
+            DurationSeconds = payload.DurationSeconds > 0 ? payload.DurationSeconds : 120,
+        });
+        return Results.Ok(new { status = "mock flight started" });
+    });
+}
+
 // --- SignalR hub ---
 app.MapHub<SimHub>("/hubs/sim");
 
@@ -123,3 +152,20 @@ public class SupabaseOptions
 }
 
 public record SessionPayload(Guid UserId);
+
+public record MockFlightPayload(
+    string OriginIcao,
+    string DestIcao,
+    string IcaoType,
+    double OriginLat,
+    double OriginLon,
+    double OriginElevFt,
+    double DestLat,
+    double DestLon,
+    double DestElevFt,
+    double CruiseAltFt,
+    double CruiseSpeedKts,
+    double FuelGal,
+    double Heading,
+    double DurationSeconds
+);

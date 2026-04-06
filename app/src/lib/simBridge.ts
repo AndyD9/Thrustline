@@ -39,6 +39,34 @@ export async function clearSession(): Promise<void> {
   }
 }
 
+/** Trigger a mock flight with dispatch parameters. No-op if sim-bridge is in native mode. */
+export async function startMockFlight(params: {
+  originIcao: string;
+  destIcao: string;
+  icaoType: string;
+  originLat: number;
+  originLon: number;
+  originElevFt: number;
+  destLat: number;
+  destLon: number;
+  destElevFt: number;
+  cruiseAltFt: number;
+  cruiseSpeedKts: number;
+  fuelGal: number;
+  heading: number;
+  durationSeconds: number;
+}): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/mock/start-flight`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    // Silently ignore — endpoint doesn't exist in native mode
+  }
+}
+
 /** Base URL du SignalR hub /hubs/sim — utilisé par useSimStream. */
 export const SIM_HUB_URL = `${BASE_URL}/hubs/sim`;
 

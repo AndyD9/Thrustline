@@ -3,16 +3,10 @@ using System.Diagnostics;
 namespace Thrustline.Bridge.SimConnect;
 
 /// <summary>
-/// Mock SimClient : simule un vol CDG → JFK pour permettre le dev sans MSFS
-/// ou sur macOS/Linux. Émet un SimData à 1 Hz.
-///
-/// Phases du vol simulé :
-///  0..10s    : au sol CDG, fuel 5000gal
-///  10..20s   : taxi + décollage (vs positive, onGround = false)
-///  20..80s   : croisière FL350
-///  80..95s   : descente
-///  95..100s  : atterrissage JFK (onGround = true)
-///  puis cycle recommence.
+/// Mock SimClient : simule un vol à la demande pour le dev sans MSFS / macOS.
+/// Reste idle (au sol) jusqu'à l'appel de <see cref="StartFlight"/>, puis
+/// simule un vol complet origin → destination avec les paramètres du dispatch.
+/// Émet un SimData à 1 Hz.
 /// </summary>
 public class MockSimClient : ISimClient
 {
@@ -22,9 +16,9 @@ public class MockSimClient : ISimClient
     private CancellationTokenSource? _cts;
     private Task? _loop;
 
-    // CDG → JFK approximatif
-    private const double CdgLat = 49.0097, CdgLon = 2.5479;
-    private const double JfkLat = 40.6413, JfkLon = -73.7781;
+    // Flight parameters — set by StartFlight()
+    private MockFlightPlan? _plan;
+    private readonly object _planLock = new();
 
     public bool IsConnected { get; private set; }
     public SimData? Latest { get; private set; }
@@ -38,9 +32,24 @@ public class MockSimClient : ISimClient
         _options = options;
     }
 
+    /// <summary>
+    /// Start a simulated flight with the given parameters.
+    /// Called from POST /mock/start-flight endpoint.
+    /// </summary>
+    public void StartFlight(MockFlightPlan plan)
+    {
+        lock (_planLock)
+        {
+            _plan = plan;
+            _clock.Restart();
+        }
+        _log.LogInformation("Mock flight started: {Origin} → {Dest} ({Type}), duration {Dur}s",
+            plan.OriginIcao, plan.DestIcao, plan.IcaoType, plan.DurationSeconds);
+    }
+
     public Task StartAsync(CancellationToken ct)
     {
-        _log.LogInformation("MockSimClient starting (mock flight CDG → JFK loop).");
+        _log.LogInformation("MockSimClient starting (idle — waiting for dispatch).");
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _clock.Restart();
         SetConnected(true);
@@ -79,71 +88,102 @@ public class MockSimClient : ISimClient
         }
     }
 
-    /// <summary>
-    /// Génère un snapshot en fonction du temps écoulé (modulo 100s).
-    /// </summary>
     private SimData GenerateSnapshot()
     {
-        var t = _clock.Elapsed.TotalSeconds % 100.0;
+        MockFlightPlan? plan;
+        lock (_planLock) { plan = _plan; }
+
+        // No flight active → idle on ground at origin (or 0,0 if no plan ever set)
+        if (plan == null)
+        {
+            return new SimData
+            {
+                Latitude = 0, Longitude = 0,
+                AltitudeFt = 0, GroundSpeedKts = 0,
+                IndicatedAirspeedKts = 0, HeadingDeg = 0,
+                VerticalSpeedFpm = 0, FuelTotalGal = 0,
+                OnGround = true, AircraftTitle = "Mock (idle)",
+            };
+        }
+
+        var elapsed = _clock.Elapsed.TotalSeconds;
+        var dur = plan.DurationSeconds;
+
+        // Phases: ground(10%) → takeoff(10%) → cruise(60%) → descent(15%) → touchdown(5%)
+        var groundEnd = dur * 0.10;
+        var takeoffEnd = dur * 0.20;
+        var cruiseEnd = dur * 0.80;
+        var descentEnd = dur * 0.95;
+        // after descentEnd → on ground at destination
 
         bool onGround;
         double alt, gs, ias, vs, fuel;
-        double lat, lon;
+        double lat, lon, hdg;
 
-        if (t < 10)
+        var cruiseAlt = plan.CruiseAltFt;
+        var startFuel = plan.FuelGal;
+        hdg = plan.Heading;
+
+        if (elapsed < groundEnd)
         {
-            // au sol CDG
+            // On ground at origin
             onGround = true;
-            alt = 392; // elev CDG
+            alt = plan.OriginElevFt;
             gs = 0; ias = 0; vs = 0;
-            fuel = 5000;
-            lat = CdgLat; lon = CdgLon;
+            fuel = startFuel;
+            lat = plan.OriginLat; lon = plan.OriginLon;
         }
-        else if (t < 20)
+        else if (elapsed < takeoffEnd)
         {
-            // décollage
-            var p = (t - 10) / 10.0;
+            // Takeoff phase
+            var p = (elapsed - groundEnd) / (takeoffEnd - groundEnd);
             onGround = p < 0.4;
-            alt = 392 + p * 8000;
-            gs = p * 200;
-            ias = p * 180;
+            alt = plan.OriginElevFt + p * Math.Min(8000, cruiseAlt * 0.25);
+            gs = p * 200; ias = p * 180;
             vs = 2200;
-            fuel = 5000 - p * 100;
-            lat = CdgLat + (JfkLat - CdgLat) * 0.01 * p;
-            lon = CdgLon + (JfkLon - CdgLon) * 0.01 * p;
+            fuel = startFuel - p * (startFuel * 0.02); // burn 2% during takeoff
+            lat = Lerp(plan.OriginLat, plan.DestLat, 0.01 * p);
+            lon = Lerp(plan.OriginLon, plan.DestLon, 0.01 * p);
         }
-        else if (t < 80)
+        else if (elapsed < cruiseEnd)
         {
-            // croisière
-            var p = (t - 20) / 60.0;
+            // Cruise
+            var p = (elapsed - takeoffEnd) / (cruiseEnd - takeoffEnd);
             onGround = false;
-            alt = 35000;
-            gs = 460; ias = 280; vs = 0;
-            fuel = 4900 - p * 2500;
-            lat = CdgLat + (JfkLat - CdgLat) * (0.01 + 0.98 * p);
-            lon = CdgLon + (JfkLon - CdgLon) * (0.01 + 0.98 * p);
+            alt = cruiseAlt;
+            gs = plan.CruiseSpeedKts; ias = plan.CruiseSpeedKts * 0.61; // rough IAS at FL350
+            vs = 0;
+            fuel = startFuel * 0.98 - p * (startFuel * 0.50); // burn 50% during cruise
+            lat = Lerp(plan.OriginLat, plan.DestLat, 0.01 + 0.98 * p);
+            lon = Lerp(plan.OriginLon, plan.DestLon, 0.01 + 0.98 * p);
         }
-        else if (t < 95)
+        else if (elapsed < descentEnd)
         {
-            // descente
-            var p = (t - 80) / 15.0;
+            // Descent
+            var p = (elapsed - cruiseEnd) / (descentEnd - cruiseEnd);
             onGround = false;
-            alt = 35000 - p * 34000;
-            gs = 460 - p * 310;
-            ias = 280 - p * 150;
+            alt = cruiseAlt * (1 - p) + plan.DestElevFt * p;
+            gs = plan.CruiseSpeedKts * (1 - 0.6 * p);
+            ias = gs * 0.61;
             vs = -1800;
-            fuel = 2400 - p * 100;
-            lat = JfkLat - (JfkLat - CdgLat) * 0.01 * (1 - p);
-            lon = JfkLon - (JfkLon - CdgLon) * 0.01 * (1 - p);
+            fuel = startFuel * 0.48 - p * (startFuel * 0.02);
+            lat = Lerp(plan.OriginLat, plan.DestLat, 0.99 + 0.01 * p);
+            lon = Lerp(plan.OriginLon, plan.DestLon, 0.99 + 0.01 * p);
         }
         else
         {
-            // touchdown JFK
+            // Touchdown at destination — stay here until next StartFlight
             onGround = true;
-            alt = 13; // elev JFK
+            alt = plan.DestElevFt;
             gs = 0; ias = 0; vs = -220;
-            fuel = 2300;
-            lat = JfkLat; lon = JfkLon;
+            fuel = startFuel * 0.46;
+            lat = plan.DestLat; lon = plan.DestLon;
+
+            // Clear plan after a few seconds on ground so we go back to idle
+            if (elapsed > descentEnd + 10)
+            {
+                lock (_planLock) { _plan = null; }
+            }
         }
 
         return new SimData
@@ -153,13 +193,15 @@ public class MockSimClient : ISimClient
             AltitudeFt = alt,
             GroundSpeedKts = gs,
             IndicatedAirspeedKts = ias,
-            HeadingDeg = 270,
+            HeadingDeg = hdg,
             VerticalSpeedFpm = vs,
             FuelTotalGal = fuel,
             OnGround = onGround,
-            AircraftTitle = "Mock A320neo",
+            AircraftTitle = $"Mock {plan.IcaoType}",
         };
     }
+
+    private static double Lerp(double a, double b, double t) => a + (b - a) * t;
 
     private void SetConnected(bool value)
     {
@@ -167,4 +209,26 @@ public class MockSimClient : ISimClient
         IsConnected = value;
         ConnectionChanged?.Invoke(this, value);
     }
+}
+
+/// <summary>
+/// Parameters for a mock flight, populated from dispatch data.
+/// </summary>
+public class MockFlightPlan
+{
+    public string OriginIcao { get; set; } = "";
+    public string DestIcao { get; set; } = "";
+    public string IcaoType { get; set; } = "";
+    public double OriginLat { get; set; }
+    public double OriginLon { get; set; }
+    public double OriginElevFt { get; set; }
+    public double DestLat { get; set; }
+    public double DestLon { get; set; }
+    public double DestElevFt { get; set; }
+    public double CruiseAltFt { get; set; } = 35000;
+    public double CruiseSpeedKts { get; set; } = 460;
+    public double FuelGal { get; set; } = 5000;
+    public double Heading { get; set; } = 270;
+    /// <summary>Total simulated flight duration in seconds (default 120s for dev).</summary>
+    public double DurationSeconds { get; set; } = 120;
 }
