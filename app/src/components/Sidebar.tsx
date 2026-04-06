@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSim } from "@/contexts/SimContext";
 import {
   LayoutDashboard,
   Plane,
@@ -9,6 +10,7 @@ import {
   DollarSign,
   Settings,
   LogOut,
+  Map,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -16,6 +18,7 @@ interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  pulse?: boolean;
 }
 
 const NAV: NavItem[] = [
@@ -30,7 +33,14 @@ const NAV: NavItem[] = [
 
 export function Sidebar() {
   const { user, signOut } = useAuth();
+  const { lastTakeoff, lastLanding, simActive } = useSim();
   const location = useLocation();
+
+  // Show "Live Flight" link when a flight is in progress
+  const flightInProgress = simActive && lastTakeoff && !lastLanding;
+  const navItems: NavItem[] = flightInProgress
+    ? [{ to: "/live-flight", label: "Live Flight", icon: Map, pulse: true }, ...NAV]
+    : NAV;
 
   return (
     <aside className="m-3 flex w-60 flex-col rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-xl px-4 py-5">
@@ -49,7 +59,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex flex-1 flex-col gap-0.5">
-        {NAV.map((item) => {
+        {navItems.map((item) => {
           const isActive = location.pathname === item.to;
           const Icon = item.icon;
           return (
@@ -69,7 +79,7 @@ export function Sidebar() {
               <Icon
                 className={`h-[18px] w-[18px] transition-colors ${
                   isActive ? "text-brand-300" : "text-slate-500 group-hover:text-slate-300"
-                }`}
+                } ${item.pulse ? "animate-pulse text-brand-300" : ""}`}
               />
               <span>{item.label}</span>
             </NavLink>

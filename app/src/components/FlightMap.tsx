@@ -113,7 +113,7 @@ export default function FlightMap({
       : [30, 0];
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/[0.06]" style={{ height }}>
+    <div className="relative z-0 overflow-hidden rounded-xl border border-white/[0.06]" style={{ height }}>
       <MapContainer
         center={center}
         zoom={4}

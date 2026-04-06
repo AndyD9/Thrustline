@@ -5,6 +5,7 @@ import App from "./App.tsx";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
 import { CompanyProvider } from "./contexts/CompanyContext.tsx";
 import { SimProvider } from "./contexts/SimContext.tsx";
+import { UnitsProvider } from "./contexts/UnitsContext.tsx";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -13,7 +14,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <AuthProvider>
         <CompanyProvider>
           <SimProvider>
-            <App />
+            <UnitsProvider>
+              <App />
+            </UnitsProvider>
           </SimProvider>
         </CompanyProvider>
       </AuthProvider>

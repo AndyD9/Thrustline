@@ -13,6 +13,12 @@ function formatMinutes(seconds: number) {
   return `${h}h ${m.toString().padStart(2, "0")}m`;
 }
 
+function formatUnixUTC(ts: number): string {
+  if (!ts) return "\u2014";
+  const d = new Date(ts * 1000);
+  return `${d.getUTCHours().toString().padStart(2, "0")}:${d.getUTCMinutes().toString().padStart(2, "0")} UTC`;
+}
+
 export default function OFPModal({ ofp, onClose, onApply }: OFPModalProps) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -70,8 +76,8 @@ export default function OFPModal({ ofp, onClose, onApply }: OFPModalProps) {
           <Section icon={Clock} title="Times">
             <div className="grid grid-cols-3 gap-3">
               <Stat label="Enroute" value={formatMinutes(ofp.times.estimEnroute)} />
-              <Stat label="Sched Out" value={ofp.times.schedOut || "—"} />
-              <Stat label="Sched In" value={ofp.times.schedIn || "—"} />
+              <Stat label="Sched Out" value={formatUnixUTC(ofp.times.schedOut)} />
+              <Stat label="Sched In" value={formatUnixUTC(ofp.times.schedIn)} />
             </div>
           </Section>
 

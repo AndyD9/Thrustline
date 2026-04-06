@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSim } from "@/contexts/SimContext";
+import { useUnits } from "@/contexts/UnitsContext";
 import { supabase } from "@/lib/supabase";
 import {
   DollarSign,
@@ -34,6 +35,7 @@ const currency = (n: number) =>
 export default function Dashboard() {
   const { company, loading } = useCompany();
   const { lastLanding, lastTakeoff, simActive, latest } = useSim();
+  const { fmt: u } = useUnits();
   const [recentFlights, setRecentFlights] = useState<Flight[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
@@ -163,9 +165,9 @@ export default function Dashboard() {
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
           <div className="mb-3 text-[10px] uppercase tracking-[0.15em] text-slate-500">Last landing</div>
           <div className="grid grid-cols-3 gap-4">
-            <MiniStat icon={Route} label="Distance" value={`${lastLanding.distanceNm.toFixed(0)} nm`} />
-            <MiniStat icon={Plane} label="Landing VS" value={`${Math.abs(lastLanding.landingVsFpm).toFixed(0)} fpm`} />
-            <MiniStat icon={Fuel} label="Fuel used" value={`${(lastLanding.fuelStartGal - lastLanding.fuelEndGal).toFixed(0)} gal`} />
+            <MiniStat icon={Route} label="Distance" value={u.distance(lastLanding.distanceNm)} />
+            <MiniStat icon={Plane} label="Landing VS" value={u.vs(Math.abs(lastLanding.landingVsFpm))} />
+            <MiniStat icon={Fuel} label="Fuel used" value={u.fuel(lastLanding.fuelStartGal - lastLanding.fuelEndGal)} />
           </div>
         </div>
       )}

@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { getHealth, type HealthResponse } from "@/lib/simBridge";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Settings as SettingsIcon, Server, Wifi, WifiOff, Cloud, Monitor, ExternalLink, Save } from "lucide-react";
+import { Settings as SettingsIcon, Server, Wifi, WifiOff, Cloud, Monitor, ExternalLink, Save, Ruler } from "lucide-react";
+import { useUnits } from "@/contexts/UnitsContext";
+import type { UnitSystem } from "@/lib/units";
 
 export default function Settings() {
   const { company, refetch: refetchCompany } = useCompany();
+  const { system: unitSystem, setSystem: setUnitSystem } = useUnits();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +53,29 @@ export default function Settings() {
         </div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
       </div>
+
+      {/* Units */}
+      <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <Ruler className="h-4 w-4 text-slate-400" />
+          <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Units</h2>
+        </div>
+        <div className="flex gap-2">
+          {(["imperial", "metric"] as UnitSystem[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => setUnitSystem(s)}
+              className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                unitSystem === s
+                  ? "bg-brand-500 text-white shadow-[0_0_16px_oklch(0.58_0.18_195_/_0.2)]"
+                  : "border border-white/[0.08] text-slate-400 hover:border-white/[0.15] hover:text-white"
+              }`}
+            >
+              {s === "imperial" ? "Imperial (gal, lbs, ft, kt)" : "Metric (kg, m, km/h)"}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {/* SimBrief */}
       <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">

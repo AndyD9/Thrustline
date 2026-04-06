@@ -35,9 +35,9 @@ export interface SimBriefOFP {
     ldw: number;
   };
   times: {
-    schedOut: string;
-    schedIn: string;
-    estimEnroute: number;
+    schedOut: number;  // unix timestamp
+    schedIn: number;   // unix timestamp
+    estimEnroute: number; // seconds
   };
   aircraft: {
     icaoType: string;
@@ -99,8 +99,8 @@ export async function fetchOFP(username: string): Promise<SimBriefOFP | null> {
       ldw: parseInt(data.weights?.est_ldw) || 0,
     },
     times: {
-      schedOut: data.times?.sched_out ?? "",
-      schedIn: data.times?.sched_in ?? "",
+      schedOut: parseInt(data.times?.sched_out) || 0,
+      schedIn: parseInt(data.times?.sched_in) || 0,
       estimEnroute: parseInt(data.times?.est_time_enroute) || 0,
     },
     aircraft: {

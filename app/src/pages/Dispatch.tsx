@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Plane, Plus, X, Play, Ban, Radio, Users, Mountain, AlertTriangle, ExternalLink, Download, Loader2, FileText } from "lucide-react";
@@ -22,6 +23,7 @@ const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: stri
 
 export default function DispatchPage() {
   const { company } = useCompany();
+  const navigate = useNavigate();
   const [dispatches, setDispatches] = useState<DispatchT[]>([]);
   const [aircraft, setAircraft] = useState<Aircraft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,7 +160,10 @@ export default function DispatchPage() {
                       </>
                     )}
                     {d.status === "dispatched" && (
-                      <ActionBtn label="Start flying" icon={Plane} variant="primary" onClick={() => void updateStatus(d.id, "flying")} />
+                      <ActionBtn label="Start flying" icon={Plane} variant="primary" onClick={async () => {
+                        await updateStatus(d.id, "flying");
+                        navigate(`/live-flight?dispatch=${d.id}`);
+                      }} />
                     )}
                     {d.status === "flying" && (
                       <span className="flex items-center gap-2 text-xs text-brand-300">

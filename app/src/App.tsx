@@ -12,6 +12,7 @@ import DispatchPage from "@/pages/Dispatch";
 import Crew from "@/pages/Crew";
 import Finances from "@/pages/Finances";
 import Settings from "@/pages/Settings";
+import LiveFlight from "@/pages/LiveFlight";
 
 function LoadingScreen({ label }: { label: string }) {
   return (
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/crew" element={<Crew />} />
         <Route path="/finances" element={<Finances />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/live-flight" element={<LiveFlight />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

@@ -1,13 +1,7 @@
 import { useSim } from "@/contexts/SimContext";
+import { useUnits } from "@/contexts/UnitsContext";
 import { Gauge, Navigation, Compass, Fuel, ArrowUpDown, Plane } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-
-function formatNumber(n: number, digits = 0) {
-  return n.toLocaleString(undefined, {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
 
 /**
  * Bandeau persistant affichant les SimVars en temps réel quand un vol est en cours.
@@ -15,6 +9,7 @@ function formatNumber(n: number, digits = 0) {
  */
 export function LiveFlightBar() {
   const { latest, simActive } = useSim();
+  const { fmt } = useUnits();
   if (!latest || !simActive) return null;
 
   const {
@@ -31,12 +26,12 @@ export function LiveFlightBar() {
     <div className="mx-3 mb-3 flex flex-wrap items-center gap-5 rounded-xl border border-brand-500/20 bg-brand-500/[0.04] px-5 py-3 text-xs glow-brand-sm animate-fade-in">
       <Stat label="PHASE" value={onGround ? "GROUND" : "AIRBORNE"} icon={Plane} accent />
       <div className="h-4 w-px bg-white/[0.06]" />
-      <Stat label="ALT" value={`${formatNumber(altitudeFt)} ft`} icon={ArrowUpDown} />
-      <Stat label="GS"  value={`${formatNumber(groundSpeedKts)} kt`} icon={Gauge} />
-      <Stat label="IAS" value={`${formatNumber(indicatedAirspeedKts)} kt`} icon={Navigation} />
-      <Stat label="HDG" value={`${formatNumber(headingDeg)}°`} icon={Compass} />
-      <Stat label="V/S" value={`${formatNumber(verticalSpeedFpm)} fpm`} icon={ArrowUpDown} />
-      <Stat label="FUEL" value={`${formatNumber(fuelTotalGal)} gal`} icon={Fuel} />
+      <Stat label="ALT" value={fmt.altitude(altitudeFt)} icon={ArrowUpDown} />
+      <Stat label="GS"  value={fmt.speed(groundSpeedKts)} icon={Gauge} />
+      <Stat label="IAS" value={fmt.speed(indicatedAirspeedKts)} icon={Navigation} />
+      <Stat label="HDG" value={`${Math.round(headingDeg)}\u00B0`} icon={Compass} />
+      <Stat label="V/S" value={fmt.vs(verticalSpeedFpm)} icon={ArrowUpDown} />
+      <Stat label="FUEL" value={fmt.fuel(fuelTotalGal)} icon={Fuel} />
     </div>
   );
 }
