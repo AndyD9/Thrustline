@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark, Users, Plane, Receipt } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark, Users, Plane, Receipt, Plus, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { CrewMember } from "@/lib/database.types";
 import {
@@ -50,7 +50,18 @@ export default function Finances() {
   const [monthlySalaries, setMonthlySalaries] = useState(0);
   const [leasedCount, setLeasedCount] = useState(0);
   const [monthlyLeases, setMonthlyLeases] = useState(0);
+  const [showLoanForm, setShowLoanForm] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const refetchFinances = async () => {
+    if (!company) return;
+    const [txRes, loanRes] = await Promise.all([
+      supabase.from("transactions").select("*").eq("company_id", company.id).order("created_at", { ascending: false }).limit(100),
+      supabase.from("loans").select("*").eq("company_id", company.id).order("created_at", { ascending: false }),
+    ]);
+    setTransactions((txRes.data as Transaction[]) ?? []);
+    setLoans((loanRes.data as Loan[]) ?? []);
+  };
 
   useEffect(() => {
     if (!company) return;
@@ -221,11 +232,31 @@ export default function Finances() {
       )}
 
       {/* Loans */}
-      {loans.length > 0 && (
-        <section className="space-y-3">
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-lg font-bold text-white">
             <Landmark className="h-5 w-5 text-slate-400" /> Loans
           </h2>
+          <button
+            onClick={() => setShowLoanForm((s) => !s)}
+            className="flex items-center gap-2 rounded-xl bg-brand-500 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-brand-400"
+          >
+            {showLoanForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            {showLoanForm ? "Cancel" : "Take a loan"}
+          </button>
+        </div>
+
+        {showLoanForm && (
+          <NewLoanForm
+            company={company}
+            onDone={() => {
+              setShowLoanForm(false);
+              void refetchFinances();
+            }}
+          />
+        )}
+
+        {loans.length > 0 && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {loans.map((loan) => {
               const progress = loan.total_months > 0 ? (loan.paid_months / loan.total_months) * 100 : 0;
@@ -259,8 +290,8 @@ export default function Finances() {
               );
             })}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* Transaction ledger */}
       <section className="space-y-3">
@@ -300,6 +331,135 @@ export default function Finances() {
         )}
       </section>
     </div>
+  );
+}
+
+/* ---------- New Loan Form ---------- */
+
+function NewLoanForm({
+  company,
+  onDone,
+}: {
+  company: Company;
+  onDone: () => void;
+}) {
+  const [principal, setPrincipal] = useState("500000");
+  const [months, setMonths] = useState("24");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const interestRate = 5.5; // Fixed APR
+  const p = Number(principal) || 0;
+  const m = Number(months) || 1;
+  const monthlyRate = interestRate / 100 / 12;
+  const monthlyPayment = monthlyRate > 0
+    ? Math.round((p * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -m)))
+    : Math.round(p / m);
+  const totalRepaid = monthlyPayment * m;
+  const totalInterest = totalRepaid - p;
+  const maxLoan = Math.round(company.capital * 3);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (p <= 0 || m <= 0) { setError("Invalid amount or duration"); return; }
+    if (p > maxLoan) { setError(`Max loan: $${maxLoan.toLocaleString()} (3x current capital)`); return; }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { error: loanErr } = await supabase.from("loans").insert({
+        user_id: company.user_id,
+        company_id: company.id,
+        principal: p,
+        monthly_payment: monthlyPayment,
+        remaining_amount: totalRepaid,
+        total_months: m,
+        paid_months: 0,
+        interest_rate: interestRate,
+      });
+      if (loanErr) throw loanErr;
+
+      // Credit capital
+      await supabase
+        .from("companies")
+        .update({ capital: company.capital + p })
+        .eq("id", company.id);
+
+      // Record transaction
+      await supabase.from("transactions").insert({
+        user_id: company.user_id,
+        company_id: company.id,
+        type: "sale",
+        amount: p,
+        description: `Loan received — $${p.toLocaleString()} over ${m} months at ${interestRate}% APR`,
+      });
+
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create loan");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="rounded-xl border border-brand-500/20 bg-brand-500/[0.03] p-5 space-y-4 animate-slide-up">
+      <h3 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">New loan</h3>
+
+      <div className="grid grid-cols-3 gap-4">
+        <label className="block">
+          <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">
+            Amount ($)
+            <span className="normal-case text-slate-600"> / max {currency(maxLoan)}</span>
+          </span>
+          <input
+            type="number"
+            value={principal}
+            onChange={(e) => setPrincipal(e.target.value)}
+            required
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-brand-400/50"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">Duration (months)</span>
+          <input
+            type="number"
+            value={months}
+            min="6"
+            max="120"
+            onChange={(e) => setMonths(e.target.value)}
+            required
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-brand-400/50"
+          />
+        </label>
+        <div>
+          <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">Interest rate</span>
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-400">
+            {interestRate}% APR (fixed)
+          </div>
+        </div>
+      </div>
+
+      {/* Loan preview */}
+      {p > 0 && m > 0 && (
+        <div className="flex gap-6 text-xs text-slate-400">
+          <span>Monthly payment: <span className="font-mono text-slate-200">{currency(monthlyPayment)}</span></span>
+          <span>Total repaid: <span className="font-mono text-slate-200">{currency(totalRepaid)}</span></span>
+          <span>Total interest: <span className="font-mono text-amber-400">{currency(totalInterest)}</span></span>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-2.5 text-xs text-red-300">{error}</div>
+      )}
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:opacity-50"
+      >
+        {submitting ? "Processing..." : `Borrow ${currency(p)}`}
+      </button>
+    </form>
   );
 }
 
