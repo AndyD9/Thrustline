@@ -5,14 +5,13 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Plane, Plus, X, Play, Ban, Radio, Users, Mountain, AlertTriangle, ExternalLink, Download, Loader2, FileText } from "lucide-react";
 import type { Aircraft, Dispatch as DispatchT, DispatchStatus } from "@/lib/database.types";
 import AirportPicker from "@/components/AirportPicker";
-import AircraftTypePicker from "@/components/AircraftTypePicker";
 import FlightMap from "@/components/FlightMap";
-import OFPModal from "@/components/OFPModal";
 import { airportByIcao } from "@/data/airports";
 import { aircraftTypeByIcao } from "@/data/aircraftTypes";
 import { haversineNm } from "@/lib/geo";
 import { fetchOFP, buildSimbriefUrl, type SimBriefOFP } from "@/lib/simbrief";
 import { startMockFlight } from "@/lib/simBridge";
+import { useUnits } from "@/contexts/UnitsContext";
 
 const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: string }> = {
   pending:    { bg: "bg-slate-500/10 border-slate-500/20",   text: "text-slate-300",   dot: "bg-slate-400" },
@@ -245,6 +244,14 @@ function ActionBtn({
 
 /* ---------- New Dispatch Form ---------- */
 
+function formatEte(distNm: number, speedKts: number): string {
+  if (!speedKts) return "";
+  const min = Math.round((distNm / speedKts) * 60);
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `~${h}h ${m.toString().padStart(2, "0")}m`;
+}
+
 function NewDispatchForm({
   companyId,
   userId,
@@ -260,30 +267,34 @@ function NewDispatchForm({
   simbriefUsername: string;
   onDone: () => void;
 }) {
-  const [flightNumber, setFlightNumber] = useState(airlineCode + "001");
+  const { fmt } = useUnits();
+
   const [originIcao, setOriginIcao] = useState("");
   const [destIcao, setDestIcao] = useState("");
   const [aircraftId, setAircraftId] = useState(aircraft[0]?.id ?? "");
   const [icaoType, setIcaoType] = useState(aircraft[0]?.icao_type ?? "");
   const [paxEco, setPaxEco] = useState("160");
   const [paxBiz, setPaxBiz] = useState("12");
+  const [cargoKg, setCargoKg] = useState("0");
   const [cruiseAlt, setCruiseAlt] = useState("35000");
+  const [estimFuelLbs, setEstimFuelLbs] = useState("0");
+  const [flightNumber, setFlightNumber] = useState(airlineCode + "001");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // SimBrief OFP
   const [ofp, setOfp] = useState<SimBriefOFP | null>(null);
-  const [showOfpModal, setShowOfpModal] = useState(false);
   const [importingOFP, setImportingOFP] = useState(false);
 
-  // Compute route distance for range validation
+  // Derived
   const originApt = airportByIcao[originIcao];
   const destApt = airportByIcao[destIcao];
+  const acType = aircraftTypeByIcao[icaoType];
   const routeDistanceNm =
     originApt && destApt
       ? Math.round(haversineNm(originApt.lat, originApt.lon, destApt.lat, destApt.lon))
       : null;
-  const acType = aircraftTypeByIcao[icaoType];
+  const cruiseSpeed = acType?.cruiseSpeedKts ?? 450;
   const outOfRange = routeDistanceNm !== null && acType && routeDistanceNm > acType.rangeNm;
 
   const onAircraftChange = (id: string) => {
@@ -291,7 +302,6 @@ function NewDispatchForm({
     const ac = aircraft.find((a) => a.id === id);
     if (ac) {
       setIcaoType(ac.icao_type);
-      // Auto-fill pax from aircraft type
       const type = aircraftTypeByIcao[ac.icao_type];
       if (type) {
         setPaxEco(String(type.maxPaxEco));
@@ -300,13 +310,10 @@ function NewDispatchForm({
     }
   };
 
-  const onTypeChange = (code: string) => {
-    setIcaoType(code);
-    const type = aircraftTypeByIcao[code];
-    if (type) {
-      setPaxEco(String(type.maxPaxEco));
-      setPaxBiz(String(type.maxPaxBiz));
-    }
+  const applyOFP = (o: SimBriefOFP) => {
+    if (o.general.cruiseAlt) setCruiseAlt(String(o.general.cruiseAlt));
+    if (o.fuel.total) setEstimFuelLbs(String(o.fuel.total));
+    if (o.weights.paxCount) setPaxEco(String(o.weights.paxCount));
   };
 
   async function onSubmit(e: FormEvent) {
@@ -324,10 +331,11 @@ function NewDispatchForm({
         icao_type: icaoType.trim().toUpperCase(),
         pax_eco: Number(paxEco),
         pax_biz: Number(paxBiz),
-        cargo_kg: 0,
-        estim_fuel_lbs: 0,
+        cargo_kg: Number(cargoKg),
+        estim_fuel_lbs: Number(estimFuelLbs),
         cruise_alt: Number(cruiseAlt),
         status: "pending",
+        ofp_data: ofp ? JSON.stringify(ofp) : null,
       });
       if (insertError) throw insertError;
       onDone();
@@ -339,62 +347,77 @@ function NewDispatchForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="rounded-xl border border-brand-500/20 bg-brand-500/[0.03] p-5 space-y-4 animate-slide-up">
+    <form onSubmit={onSubmit} className="rounded-xl border border-brand-500/20 bg-brand-500/[0.03] p-5 space-y-5 animate-slide-up">
       <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">New dispatch</h2>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Field label="Flight number" value={flightNumber} onChange={(v) => setFlightNumber(v.toUpperCase())} placeholder={`${airlineCode}001`} required />
+      {/* ── Step 1: Route ────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4">
         <AirportPicker label="Origin (ICAO)" value={originIcao} onChange={setOriginIcao} placeholder="LFPG" required />
         <AirportPicker label="Destination (ICAO)" value={destIcao} onChange={setDestIcao} placeholder="KJFK" required />
       </div>
 
-      {/* Route distance info + map preview */}
       {routeDistanceNm !== null && (
-        <div className="space-y-3">
-          <div className={`flex items-center gap-2 text-xs ${outOfRange ? "text-amber-400" : "text-slate-500"}`}>
-            {outOfRange && <AlertTriangle className="h-3.5 w-3.5" />}
-            Route distance: {routeDistanceNm.toLocaleString()} nm
-            {acType && ` / Aircraft range: ${acType.rangeNm.toLocaleString()} nm`}
-            {outOfRange && " — out of range!"}
-          </div>
-          <FlightMap
-            origin={originApt}
-            destination={destApt}
-            waypoints={ofp?.navlog?.map((f) => [f.lat, f.lon] as [number, number])}
-            height="180px"
-            interactive={false}
-          />
+        <div className={`flex items-center gap-2 text-xs ${outOfRange ? "text-amber-400" : "text-slate-500"}`}>
+          {outOfRange && <AlertTriangle className="h-3.5 w-3.5" />}
+          <span className="font-mono font-semibold text-slate-300">{routeDistanceNm.toLocaleString()} nm</span>
+          <span className="text-slate-600">·</span>
+          <span>{formatEte(routeDistanceNm, cruiseSpeed)}</span>
+          {acType && (
+            <>
+              <span className="text-slate-600">·</span>
+              <span>Range: {acType.rangeNm.toLocaleString()} nm</span>
+            </>
+          )}
+          {outOfRange && <span className="font-semibold"> — out of range!</span>}
         </div>
       )}
 
-      <div className="grid grid-cols-5 gap-4">
+      {/* ── Step 2: Aircraft ─────────────────────────── */}
+      <div>
         <label className="block">
           <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">Aircraft</span>
           <select
             value={aircraftId}
             onChange={(e) => onAircraftChange(e.target.value)}
+            required
             className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-brand-400/50"
           >
-            <option value="">None</option>
+            <option value="">Select aircraft...</option>
             {aircraft.map((ac) => (
               <option key={ac.id} value={ac.id}>{ac.name} ({ac.icao_type})</option>
             ))}
           </select>
         </label>
-        <AircraftTypePicker label="Type" value={icaoType} onChange={(v) => onTypeChange(v)} required />
-        <Field label="Pax economy" value={paxEco} onChange={setPaxEco} type="number" required />
-        <Field label="Pax business" value={paxBiz} onChange={setPaxBiz} type="number" required />
+
+        {/* Aircraft specs pills */}
+        {acType && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Pill label="Type" value={icaoType} />
+            <Pill label="Range" value={fmt.distance(acType.rangeNm)} />
+            <Pill label="Max Pax" value={`${acType.maxPaxEco}Y + ${acType.maxPaxBiz}J`} />
+            <Pill label="Fuel Cap" value={fmt.fuel(acType.fuelCapacityGal)} />
+            <Pill label="Cruise" value={fmt.speed(acType.cruiseSpeedKts)} />
+            <Pill label="Ceiling" value={fmt.altitude(acType.ceilingFt)} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Step 3: Load ─────────────────────────────── */}
+      <div className="grid grid-cols-4 gap-4">
+        <FieldWithMax label="Pax economy" value={paxEco} onChange={setPaxEco} type="number" required max={acType?.maxPaxEco} />
+        <FieldWithMax label="Pax business" value={paxBiz} onChange={setPaxBiz} type="number" required max={acType?.maxPaxBiz} />
+        <Field label="Cargo (kg)" value={cargoKg} onChange={setCargoKg} type="number" />
         <Field label="Cruise alt (ft)" value={cruiseAlt} onChange={setCruiseAlt} type="number" required />
       </div>
 
-      {/* SimBrief buttons */}
+      {/* ── Step 4: SimBrief ─────────────────────────── */}
       {simbriefUsername && (
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => {
               if (!originIcao || !destIcao || !icaoType) {
-                setError("Fill origin, destination and aircraft type first");
+                setError("Fill origin, destination and aircraft first");
                 return;
               }
               window.open(buildSimbriefUrl(originIcao, destIcao, icaoType), "_blank");
@@ -410,7 +433,6 @@ function NewDispatchForm({
             onClick={async () => {
               setImportingOFP(true);
               setError(null);
-              // Poll every 5s for max 60s
               let attempts = 0;
               const poll = async (): Promise<SimBriefOFP | null> => {
                 const result = await fetchOFP(simbriefUsername);
@@ -423,7 +445,7 @@ function NewDispatchForm({
               setImportingOFP(false);
               if (result) {
                 setOfp(result);
-                setShowOfpModal(true);
+                applyOFP(result);
               } else {
                 setError("Could not fetch OFP. Generate a flight plan on SimBrief first.");
               }
@@ -433,55 +455,119 @@ function NewDispatchForm({
             {importingOFP ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             {importingOFP ? "Fetching OFP..." : "Import OFP"}
           </button>
-          {ofp && (
-            <button
-              type="button"
-              onClick={() => setShowOfpModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-emerald-500/20 px-3 py-2 text-xs font-semibold text-emerald-300 transition-all hover:bg-emerald-500/[0.06]"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              View OFP
-            </button>
-          )}
         </div>
+      )}
+
+      {/* ── Step 5: OFP Inline Resume ────────────────── */}
+      {ofp && (
+        <div className="space-y-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-4 animate-slide-up">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.15em] text-emerald-400">
+            <FileText className="h-3.5 w-3.5" />
+            OFP Imported
+          </div>
+
+          {/* Route */}
+          <div className="font-mono text-xs text-slate-400 leading-relaxed break-all">
+            {ofp.general.route || "Direct"}
+          </div>
+
+          {/* Key figures */}
+          <div className="grid grid-cols-4 gap-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">Block Fuel</div>
+              <div className="font-mono text-sm font-medium text-slate-200">{ofp.fuel.total.toLocaleString()} lbs</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">ZFW</div>
+              <div className="font-mono text-sm font-medium text-slate-200">{ofp.weights.zfw.toLocaleString()} lbs</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">Cruise</div>
+              <div className="font-mono text-sm font-medium text-slate-200">FL{(ofp.general.cruiseAlt / 100).toFixed(0)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-600">Enroute</div>
+              <div className="font-mono text-sm font-medium text-slate-200">{formatEte(0, 0).length ? "" : ""}{(() => { const s = ofp.times.estimEnroute; const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); return `${h}h ${m.toString().padStart(2, "0")}m`; })()}</div>
+            </div>
+          </div>
+
+          {/* Map with waypoints */}
+          <FlightMap
+            origin={originApt}
+            destination={destApt}
+            waypoints={ofp.navlog.map((f) => [f.lat, f.lon] as [number, number])}
+            height="180px"
+            interactive={false}
+          />
+        </div>
+      )}
+
+      {/* Route map preview (only when no OFP — OFP section has its own map) */}
+      {!ofp && routeDistanceNm !== null && (
+        <FlightMap origin={originApt} destination={destApt} height="160px" interactive={false} />
       )}
 
       {error && (
         <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-2.5 text-xs text-red-300">{error}</div>
       )}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:opacity-50"
-      >
-        {submitting ? "Creating..." : "Create dispatch"}
-      </button>
-
-      {/* OFP Modal */}
-      {showOfpModal && ofp && (
-        <OFPModal
-          ofp={ofp}
-          onClose={() => setShowOfpModal(false)}
-          onApply={(o) => {
-            // Apply OFP data to form fields
-            if (o.origin.icao) setOriginIcao(o.origin.icao);
-            if (o.destination.icao) setDestIcao(o.destination.icao);
-            if (o.aircraft.icaoType) {
-              setIcaoType(o.aircraft.icaoType);
-              const type = aircraftTypeByIcao[o.aircraft.icaoType];
-              if (type) {
-                setPaxEco(String(type.maxPaxEco));
-                setPaxBiz(String(type.maxPaxBiz));
-              }
-            }
-            if (o.general.cruiseAlt) setCruiseAlt(String(o.general.cruiseAlt));
-            if (o.weights.paxCount) setPaxEco(String(o.weights.paxCount));
-            setShowOfpModal(false);
-          }}
-        />
-      )}
+      {/* ── Step 6: Submit ───────────────────────────── */}
+      <div className="flex items-end gap-4">
+        <Field label="Flight number" value={flightNumber} onChange={(v) => setFlightNumber(v.toUpperCase())} placeholder={`${airlineCode}001`} required />
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:opacity-50"
+        >
+          {submitting ? "Creating..." : "Create dispatch"}
+        </button>
+      </div>
     </form>
+  );
+}
+
+/* ---------- Spec pill ---------- */
+
+function Pill({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-[11px]">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-mono font-medium text-slate-200">{value}</span>
+    </span>
+  );
+}
+
+/* ---------- Field with max indicator ---------- */
+
+function FieldWithMax({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required,
+  max,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  required?: boolean;
+  max?: number;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 flex items-baseline gap-1 text-[10px] uppercase tracking-[0.15em] text-slate-400">
+        {label}
+        {max !== undefined && <span className="text-slate-600 normal-case">/ {max}</span>}
+      </span>
+      <input
+        type={type}
+        value={value}
+        required={required}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-brand-400/50"
+      />
+    </label>
   );
 }
 
