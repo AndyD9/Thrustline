@@ -280,6 +280,7 @@ function NewDispatchForm({
   const [cruiseAlt, setCruiseAlt] = useState("35000");
   const [estimFuelLbs, setEstimFuelLbs] = useState("0");
   const [flightNumber, setFlightNumber] = useState(airlineCode + "001");
+  const [callsign, setCallsign] = useState(airlineCode + "001");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -410,7 +411,13 @@ function NewDispatchForm({
         <Field label="Cargo (kg)" value={cargoKg} onChange={setCargoKg} type="number" />
       </div>
 
-      {/* ── Step 4: SimBrief ─────────────────────────── */}
+      {/* ── Step 4: Flight ID ────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Flight number" value={flightNumber} onChange={(v) => setFlightNumber(v.toUpperCase())} placeholder={`${airlineCode}001`} required />
+        <Field label="Callsign" value={callsign} onChange={(v) => setCallsign(v.toUpperCase())} placeholder={`${airlineCode}001`} />
+      </div>
+
+      {/* ── Step 5: SimBrief ─────────────────────────── */}
       {simbriefUsername && (
         <div className="flex items-center gap-3">
           <button
@@ -420,7 +427,14 @@ function NewDispatchForm({
                 setError("Fill origin, destination and aircraft first");
                 return;
               }
-              void shellOpen(buildSimbriefUrl(originIcao, destIcao, icaoType));
+              void shellOpen(buildSimbriefUrl({
+                origin: originIcao,
+                dest: destIcao,
+                icaoType,
+                airline: airlineCode,
+                flightNumber: flightNumber.replace(airlineCode, ""),
+                callsign,
+              }));
             }}
             className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-3 py-2 text-xs font-semibold text-slate-300 transition-all hover:border-white/[0.15] hover:text-white"
           >
@@ -511,17 +525,14 @@ function NewDispatchForm({
         <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-2.5 text-xs text-red-300">{error}</div>
       )}
 
-      {/* ── Step 6: Submit ───────────────────────────── */}
-      <div className="flex items-end gap-4">
-        <Field label="Flight number" value={flightNumber} onChange={(v) => setFlightNumber(v.toUpperCase())} placeholder={`${airlineCode}001`} required />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:opacity-50"
-        >
-          {submitting ? "Creating..." : "Create dispatch"}
-        </button>
-      </div>
+      {/* ── Submit ─────────────────────────────────── */}
+      <button
+        type="submit"
+        disabled={submitting}
+        className="rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:opacity-50"
+      >
+        {submitting ? "Creating..." : "Create dispatch"}
+      </button>
     </form>
   );
 }

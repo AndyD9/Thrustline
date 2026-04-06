@@ -112,11 +112,21 @@ export async function fetchOFP(username: string): Promise<SimBriefOFP | null> {
 }
 
 /** Build SimBrief dispatch URL with pre-filled fields. */
-export function buildSimbriefUrl(origin: string, dest: string, icaoType: string): string {
+export function buildSimbriefUrl(opts: {
+  origin: string;
+  dest: string;
+  icaoType: string;
+  airline?: string;
+  flightNumber?: string;
+  callsign?: string;
+}): string {
   const params = new URLSearchParams({
-    orig: origin,
-    dest: dest,
-    type: icaoType,
+    orig: opts.origin,
+    dest: opts.dest,
+    type: opts.icaoType,
   });
+  if (opts.airline) params.set("airline", opts.airline);
+  if (opts.flightNumber) params.set("fltnum", opts.flightNumber);
+  if (opts.callsign) params.set("callsign", opts.callsign);
   return `https://dispatch.simbrief.com/options/custom?${params}`;
 }
