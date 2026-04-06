@@ -344,10 +344,11 @@ function AddAircraftForm({
           </select>
         </label>
         {ownership === "leased" ? (
-          <Field label="Lease cost / mo" value={leaseCost} onChange={setLeaseCost} placeholder="50000" type="number" required />
+          <ReadOnlyField label="Lease cost / mo" value={`$${Number(leaseCost).toLocaleString()}`} />
         ) : (
-          <Field label="Purchase price" value={purchasePrice} onChange={setPurchasePrice} placeholder="80000000" type="number" required />
+          <ReadOnlyField label="Purchase price" value={`$${Number(purchasePrice).toLocaleString()}`} />
         )}
+        <ReadOnlyField label={ownership === "leased" ? "Market value" : "Lease equivalent"} value={ownership === "leased" ? `$${Number(purchasePrice).toLocaleString()}` : `$${Number(leaseCost).toLocaleString()}/mo`} />
       </div>
 
       {error && (
@@ -362,6 +363,19 @@ function AddAircraftForm({
         {submitting ? "Adding..." : "Add aircraft"}
       </button>
     </form>
+  );
+}
+
+/* ---------- Read-only field ---------- */
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="block">
+      <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">{label}</span>
+      <div className="w-full rounded-xl border border-white/[0.06] bg-white/[0.01] px-3 py-2.5 text-sm font-mono text-slate-300">
+        {value}
+      </div>
+    </div>
   );
 }
 
