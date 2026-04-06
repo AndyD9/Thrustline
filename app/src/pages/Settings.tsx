@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
 import { getHealth, type HealthResponse } from "@/lib/simBridge";
-import { Settings as SettingsIcon, Server, Wifi, WifiOff, Cloud, Monitor } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useCompany } from "@/contexts/CompanyContext";
+import { Settings as SettingsIcon, Server, Wifi, WifiOff, Cloud, Monitor, ExternalLink, Save } from "lucide-react";
 
 export default function Settings() {
+  const { company, refetch: refetchCompany } = useCompany();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // SimBrief username
+  const [simbriefUsername, setSimbriefUsername] = useState(company?.simbrief_username ?? "");
+  const [savingSimbrief, setSavingSimbrief] = useState(false);
+  const [simbriefSaved, setSimbriefSaved] = useState(false);
+
+  useEffect(() => {
+    if (company?.simbrief_username) setSimbriefUsername(company.simbrief_username);
+  }, [company?.simbrief_username]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -17,6 +29,19 @@ export default function Settings() {
     return () => ctrl.abort();
   }, []);
 
+  const saveSimbriefUsername = async () => {
+    if (!company) return;
+    setSavingSimbrief(true);
+    await supabase
+      .from("companies")
+      .update({ simbrief_username: simbriefUsername.trim() || null })
+      .eq("id", company.id);
+    await refetchCompany();
+    setSavingSimbrief(false);
+    setSimbriefSaved(true);
+    setTimeout(() => setSimbriefSaved(false), 2000);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-3">
@@ -25,6 +50,39 @@ export default function Settings() {
         </div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
       </div>
+
+      {/* SimBrief */}
+      <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <ExternalLink className="h-4 w-4 text-slate-400" />
+          <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">SimBrief integration</h2>
+        </div>
+        <div className="flex items-end gap-3">
+          <label className="block flex-1">
+            <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">
+              SimBrief username
+            </span>
+            <input
+              type="text"
+              value={simbriefUsername}
+              onChange={(e) => setSimbriefUsername(e.target.value)}
+              placeholder="your_simbrief_username"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-brand-400/50"
+            />
+          </label>
+          <button
+            onClick={() => void saveSimbriefUsername()}
+            disabled={savingSimbrief}
+            className="flex items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            {simbriefSaved ? "Saved!" : savingSimbrief ? "Saving..." : "Save"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-slate-600">
+          Your SimBrief username is used to fetch OFP data. Find it at simbrief.com under your account settings.
+        </p>
+      </section>
 
       {/* sim-bridge status */}
       <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">

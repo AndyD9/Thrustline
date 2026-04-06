@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Plane, Wrench, Clock, Hash, Plus, X, ChevronRight } from "lucide-react";
 import type { Aircraft } from "@/lib/database.types";
+import AircraftTypePicker from "@/components/AircraftTypePicker";
 
 const pct = (n: number) => `${n.toFixed(1)}%`;
 const currency = (n: number) =>
@@ -223,11 +224,10 @@ function AddAircraftForm({
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Name" value={name} onChange={setName} placeholder="Thrustline One" required />
-        <Field
+        <AircraftTypePicker
           label="ICAO type"
           value={icaoType}
-          onChange={(v) => setIcaoType(v.toUpperCase())}
-          placeholder="B738"
+          onChange={(v) => setIcaoType(v)}
           required
         />
       </div>

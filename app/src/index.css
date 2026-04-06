@@ -192,3 +192,37 @@ body {
 .recharts-tooltip-wrapper {
   outline: none !important;
 }
+
+/* ─── Leaflet overrides ──────────────────────────────── */
+
+.leaflet-container {
+  background: #0a0f18 !important;
+  font-family: inherit;
+}
+
+.airport-tooltip {
+  background: rgba(10, 15, 24, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 6px !important;
+  color: oklch(0.58 0.18 195) !important;
+  font-family: ui-monospace, monospace !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+.airport-tooltip::before {
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(10, 15, 24, 0.8) !important;
+  color: #94a3b8 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgba(20, 30, 48, 0.9) !important;
+  color: #e2e8f0 !important;
+}

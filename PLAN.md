@@ -83,50 +83,48 @@ Tauri shell (Rust)
 
 ---
 
-## Phase 4 — Features majeures (EN COURS)
+## Phase 4 — Features majeures (TERMINE)
 
 ### 4.1 Base aeroports (ICAO)
-- [ ] Fichier statique `airports.ts` (~2500 aeroports large+medium)
-  - Source : OurAirports (type `large_airport` + `medium_airport`, `scheduled_service=yes`)
+- [x] Fichier statique `airports.ts` (3232 aeroports, ICAO 4-lettres, large+medium, scheduled_service)
+  - Source : OurAirports CSV auto-parse
   - Champs : `icao, iata, name, city, country, lat, lon, elevation_ft`
-- [ ] Composant `AirportPicker.tsx` — input autocomplete (recherche ICAO, IATA, nom, ville)
-- [ ] Branche dans Dispatch (origin/dest) et Onboarding (hub)
-- [ ] Validation : affichage nom + ville a côte du code ICAO
+  - Index `airportByIcao` pour lookup O(1)
+- [x] Composant `AirportPicker.tsx` — input autocomplete (recherche ICAO, IATA, nom, ville)
+  - Max 8 resultats, priorite exact > startsWith > contains
+  - Keyboard navigation (Arrow, Enter, Escape)
+  - Affiche nom + ville sous le code selectionne
+- [x] Branche dans Dispatch (origin/dest) et Onboarding (hub)
 
 ### 4.2 Base avions (types + contraintes)
-- [ ] Fichier statique `aircraftTypes.ts` (~30-40 types MSFS courants)
-  - Champs : `icaoType, name, manufacturer, range_nm, maxPaxEco, maxPaxBiz, fuelCapacityGal, ceilingFt, cruiseSpeedKts`
-- [ ] Composant `AircraftTypePicker.tsx` — dropdown avec specs affichées
-- [ ] Validation Dispatch : bloque si distance route > range avion
-- [ ] Auto-fill pax eco/biz depuis le type selectionne
+- [x] Fichier statique `aircraftTypes.ts` (36 types MSFS courants)
+  - Airbus (A319→A388), Boeing (B737→B78X), Regional (CRJ, Embraer), Turboprops (ATR, Dash8), GA (C172, TBM9, PC12)
+  - Champs : `icaoType, name, manufacturer, rangeNm, maxPaxEco, maxPaxBiz, fuelCapacityGal, ceilingFt, cruiseSpeedKts`
+- [x] Composant `AircraftTypePicker.tsx` — dropdown searchable avec specs
+- [x] Validation Dispatch : warning si distance route > range avion (haversine)
+- [x] Auto-fill pax eco/biz depuis le type selectionne
+- [x] Integration Fleet : remplacement input icao_type
 
 ### 4.3 Carte live (Flight Map)
-- [ ] Package `react-leaflet` + tiles OpenStreetMap (dark theme)
-- [ ] Composant `FlightMap.tsx` reutilisable
-  - Marqueur avion anime (lat/lon depuis `useSim().latest`)
-  - Polyline route origin → waypoints → dest
-  - Marqueurs aeroports origin/dest avec labels ICAO
-- [ ] Integration Dashboard (carte miniature)
-- [ ] Integration Dispatch (carte plein ecran / modal)
-- [ ] Dark map tiles (CartoDB dark_matter ou Stadia dark)
+- [x] Package `react-leaflet@4` + `leaflet@1` (compatible React 18)
+- [x] Composant `FlightMap.tsx` reutilisable (props: origin, dest, waypoints, aircraft)
+  - Marqueur avion anime avec rotation heading (SVG)
+  - Polyline route (dashed, couleur brand cyan)
+  - Marqueurs aeroports avec labels ICAO permanents
+  - Auto-fit bounds sur origin+dest
+- [x] Integration Dashboard (carte 260px, non-interactive, hub + avion live)
+- [x] Integration Dispatch (carte 180px dans le formulaire, route quand origin+dest)
+- [x] Dark map tiles CartoDB dark_matter + Leaflet CSS overrides
 
 ### 4.4 Integration SimBrief
-- [ ] Champ `simbrief_username` dans Settings (stocke dans `companies.simbrief_username`)
-- [ ] Bouton "Generate on SimBrief" dans Dispatch
-  - Ouvre popup SimBrief dispatch pre-remplie (origin, dest, aircraft type)
-  - URL : `https://dispatch.simbrief.com/options/custom?orig=XXXX&dest=XXXX&type=XXXX`
-- [ ] Poll `xml.fetcher.php?username=XXX&json=1` toutes les 5s (max 60s)
-- [ ] Parse OFP : route, fuel breakdown, temps, navlog (waypoints)
-- [ ] Stocke dans `dispatch.ofp_data` (JSON)
-- [ ] Modal OFP avec infos du vol (fuel, route, timings, weights)
-- [ ] Trace route waypoints sur la carte
-- [ ] Position avion sur le point de depart
-
-**API SimBrief** :
-- Endpoint : `https://www.simbrief.com/api/xml.fetcher.php?username=XXX&json=1`
-- Auth : username uniquement (pas de cle API)
-- Retourne : origin/dest, route, navlog (waypoints lat/lon), fuel breakdown, times, weights
-- Pas d'API de generation server-side → on redirige vers l'UI SimBrief
+- [x] Champ `simbrief_username` dans Settings (sauvegarde Supabase)
+- [x] Bouton "Generate on SimBrief" dans Dispatch (ouvre URL pre-remplie)
+- [x] Bouton "Import OFP" — poll API toutes les 5s (max 60s)
+- [x] Lib `simbrief.ts` — fetch + parse OFP (route, fuel, weights, times, navlog)
+- [x] Modal OFP glassmorphism avec sections (Route, Fuel, Weights, Times, Aircraft)
+- [x] Bouton "Apply to dispatch" dans OFP Modal → pre-remplit le formulaire
+- [x] Trace route waypoints navlog sur la carte
+- [x] Helper `geo.ts` — haversine distance en nautical miles
 
 ---
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSim } from "@/contexts/SimContext";
 import { supabase } from "@/lib/supabase";
@@ -25,13 +25,15 @@ import {
   Bar,
 } from "recharts";
 import type { Flight, Transaction } from "@/lib/database.types";
+import FlightMap from "@/components/FlightMap";
+import { airportByIcao } from "@/data/airports";
 
 const currency = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 export default function Dashboard() {
   const { company, loading } = useCompany();
-  const { lastLanding, lastTakeoff, simActive } = useSim();
+  const { lastLanding, lastTakeoff, simActive, latest } = useSim();
   const [recentFlights, setRecentFlights] = useState<Flight[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
@@ -143,6 +145,18 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Flight Map */}
+      <FlightMap
+        origin={company.hub_icao ? airportByIcao[company.hub_icao] : undefined}
+        aircraft={
+          latest && !latest.onGround
+            ? { lat: latest.latitude, lon: latest.longitude, heading: latest.headingDeg }
+            : undefined
+        }
+        height="260px"
+        interactive={false}
+      />
 
       {/* Last landing */}
       {lastLanding && (

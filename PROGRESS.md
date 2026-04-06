@@ -7,7 +7,7 @@
 
 ## Branche : `rework`
 
-## Phase actuelle : Phase 4 — Features majeures (aeroports, avions, carte, SimBrief)
+## Phase actuelle : Phase 5 — Game Mechanics (evenements, loans, salaires, reputation)
 
 ---
 
@@ -75,30 +75,48 @@ cb82af6 feat(sim-bridge): scaffold .NET 8 service with EF Core entities + SimCon
 | waitForBridge | DONE | Retry helper startup |
 | UI Polish v2 | DONE | Lucide icons, recharts, glassmorphism v2, animations |
 
+### Phase 4 — Features majeures
+
+| Feature | Status | Details |
+|---|---|---|
+| Airport database | DONE | 3232 aeroports ICAO 4-lettres, OurAirports source |
+| AirportPicker | DONE | Autocomplete ICAO/IATA/nom/ville, keyboard nav, 8 resultats |
+| Aircraft types database | DONE | 36 types MSFS (Airbus, Boeing, Regional, Turboprops, GA) |
+| AircraftTypePicker | DONE | Dropdown searchable avec specs affichees |
+| Dispatch enhancements | DONE | AirportPicker origin/dest, AircraftTypePicker, auto-fill pax, range validation |
+| Onboarding hub picker | DONE | AirportPicker pour hub_icao |
+| Fleet type picker | DONE | AircraftTypePicker pour icao_type |
+| FlightMap | DONE | react-leaflet dark tiles, aircraft marker, route polyline, auto-fit bounds |
+| Dashboard map | DONE | Carte 260px non-interactive, hub + avion live |
+| Dispatch map | DONE | Carte 180px, route preview quand origin+dest, waypoints OFP |
+| SimBrief settings | DONE | Champ simbrief_username dans Settings |
+| SimBrief dispatch | DONE | "Generate on SimBrief" + "Import OFP" (poll 5s/60s) |
+| OFP Modal | DONE | Route, Fuel, Weights, Times, Aircraft + "Apply to dispatch" |
+| Geo utilities | DONE | haversine distance NM |
+
 ---
 
-## En cours — Phase 4
+## En cours — Phase 5
 
-### 4.1 Base aeroports (ICAO)
-- [ ] Dataset `airports.ts` (~2500 aeroports)
-- [ ] Composant `AirportPicker.tsx` (autocomplete)
-- [ ] Branche dans Dispatch + Onboarding
+### 5.1 Evenements aleatoires
+- [ ] `GameEvent` system : fuel_spike, weather, tourism_boom, strike, mechanical
+- [ ] Modificateurs temporaires sur les routes/avions
+- [ ] Notifications in-app
 
-### 4.2 Base avions (types + contraintes)
-- [ ] Dataset `aircraftTypes.ts` (~30-40 types)
-- [ ] Composant `AircraftTypePicker.tsx`
-- [ ] Validation range dans Dispatch
+### 5.2 Systeme de loans
+- [ ] Prendre un emprunt pour acheter un avion
+- [ ] Remboursements mensuels automatiques
+- [ ] UI dans Finances
 
-### 4.3 Carte live
-- [ ] `FlightMap.tsx` avec react-leaflet
-- [ ] Marqueur avion anime + route polyline
-- [ ] Integration Dashboard + Dispatch
+### 5.3 Salaires & charges mensuelles
+- [ ] Deduction automatique salaires crew
+- [ ] Deduction lease cost avions
+- [ ] Timer mensuel (ou par session)
 
-### 4.4 SimBrief
-- [ ] Settings : champ simbrief_username
-- [ ] Dispatch : bouton "Generate on SimBrief"
-- [ ] Poll & parse OFP
-- [ ] Modal infos vol + route sur carte
+### 5.4 Reputation avancee
+- [ ] Score par route influence la demande pax
+- [ ] Bonus/malus visibles dans l'UI
+- [ ] Deblocage de routes premium
 
 ---
 
@@ -139,10 +157,11 @@ npx supabase gen types typescript --project-id <ref> > app/src/lib/database.type
 Thurstline/
 ├── app/                              # Tauri + React
 │   ├── src/
-│   │   ├── components/               # Layout, Sidebar, LiveFlightBar, SimStatusBadge
+│   │   ├── components/               # Layout, Sidebar, LiveFlightBar, SimStatusBadge, AirportPicker, AircraftTypePicker, FlightMap, OFPModal
 │   │   ├── contexts/                 # AuthContext, CompanyContext, SimContext
+│   │   ├── data/                     # airports.ts (3232), aircraftTypes.ts (36)
 │   │   ├── hooks/                    # useSimStream, useRealtimeTable
-│   │   ├── lib/                      # supabase.ts, simBridge.ts, database.types.ts
+│   │   ├── lib/                      # supabase.ts, simBridge.ts, simbrief.ts, geo.ts, database.types.ts
 │   │   └── pages/                    # Dashboard, Flights, Fleet, Dispatch, Crew, Finances, Settings, Auth, Onboarding
 │   └── src-tauri/
 │       ├── src/lib.rs                # Sidecar spawn + kill

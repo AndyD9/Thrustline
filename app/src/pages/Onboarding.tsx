@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Plane, Building2, MapPin, Rocket } from "lucide-react";
+import { Plane, Building2, Rocket } from "lucide-react";
+import AirportPicker from "@/components/AirportPicker";
 
 export default function Onboarding() {
   const { user } = useAuth();
@@ -102,19 +103,14 @@ export default function Onboarding() {
 
               {/* Hub airport */}
               <div>
-                <label className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">
-                  Hub airport (ICAO)
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                  <input
-                    value={hubIcao}
-                    onChange={(e) => setHubIcao(e.target.value.toUpperCase())}
-                    placeholder="LFPG"
-                    required
-                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 pl-10 pr-3 text-sm font-mono text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-brand-400/50 focus:glow-brand-sm"
-                  />
-                </div>
+                <AirportPicker
+                  label="Hub airport (ICAO)"
+                  value={hubIcao}
+                  onChange={setHubIcao}
+                  placeholder="LFPG"
+                  required
+                  icon
+                />
               </div>
             </div>
 
