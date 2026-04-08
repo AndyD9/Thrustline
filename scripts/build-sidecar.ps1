@@ -43,7 +43,7 @@ if (Test-Path $SimConnectDll) {
     Copy-Item $SimConnectDll $TargetDir -Force
     Write-Host "SimConnect DLL copied to binaries/" -ForegroundColor Yellow
 } else {
-    Write-Host "WARNING: SimConnect DLL not found in publish output — sidecar will run in mock mode" -ForegroundColor Yellow
+    Write-Host "WARNING: SimConnect DLL not found in publish output - sidecar will run in mock mode" -ForegroundColor Yellow
 }
 
 $Size = [math]::Round((Get-Item $TargetFile).Length / 1MB, 1)
