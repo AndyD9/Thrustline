@@ -1,8 +1,18 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Thrustline.Bridge.Cloud;
 using Thrustline.Bridge.Services;
 using Thrustline.Bridge.Session;
 using Thrustline.Bridge.SimConnect;
+
+// --- Ensure .NET finds mixed-mode DLLs next to the exe, not just CWD ---
+// Tauri may launch the sidecar with a different working directory than the exe location.
+// The SimConnect managed DLL is mixed-mode (C++/CLI) and .NET resolves it from CWD by default.
+var exeDir = AppContext.BaseDirectory;
+if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+{
+    Environment.CurrentDirectory = exeDir;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
