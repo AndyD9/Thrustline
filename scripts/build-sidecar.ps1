@@ -47,4 +47,5 @@ if (Test-Path $SimConnectDll) {
 }
 
 $Size = [math]::Round((Get-Item $TargetFile).Length / 1MB, 1)
-Write-Host ("=== Sidecar ready: {0} ({1} MB) ===" -f $TargetFile, $Size) -ForegroundColor Green
+$Msg = "=== Sidecar ready: " + $TargetFile + " (" + $Size + " MB) ==="
+Write-Host $Msg -ForegroundColor Green
