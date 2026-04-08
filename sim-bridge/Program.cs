@@ -181,7 +181,7 @@ app.Run();
 
 public class SimBridgeOptions
 {
-    public bool UseMockSimConnect { get; set; } = true;
+    public bool UseMockSimConnect { get; set; } = false;
     public int PollingIntervalMs { get; set; } = 1000;
     public int GroundDebounceSeconds { get; set; } = 5;
 }
