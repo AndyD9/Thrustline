@@ -1,20 +1,20 @@
 // NativeSimConnectClient.cs
-// Implémentation réelle de ISimClient via le SDK officiel SimConnect (MSFS 2024).
+// Implémentation de ISimClient via SimConnect.NET (NuGet).
 //
-// Fonctionne UNIQUEMENT sous Windows avec la DLL SimConnect installée (via MSFS SDK).
-// Ce fichier est compilé conditionnellement (voir csproj: Windows_NT uniquement).
+// Fonctionne UNIQUEMENT sous Windows avec SimConnect.dll disponible
+// (installé avec MSFS 2024, ou copié manuellement).
 //
 // Architecture :
-//   - Thread dédié avec message pump Win32 (SimConnect exige WndProc)
-//   - Enregistre les SimVars nécessaires dans un struct
-//   - Demande les données à 1 Hz (SIMCONNECT_PERIOD.SECOND)
-//   - Retry connexion toutes les 5s si MSFS n'est pas lancé
+//   - Thread dédié avec message pump Win32 (requis par SimConnect)
+//   - Struct décoré [SimConnect] pour les SimVars
+//   - Subscription à 1 Hz via SimVarManager
+//   - Auto-reconnect géré par SimConnect.NET
 //   - Émet DataReceived à chaque snapshot, ConnectionChanged sur open/quit
 
-#if HAS_SIMCONNECT
-
 using System.Runtime.InteropServices;
-using Microsoft.FlightSimulator.SimConnect;
+using SimConnect.NET;
+using SimConnect.NET.Events;
+using SimConnect.NET.SimVar;
 
 namespace Thrustline.Bridge.SimConnect;
 
@@ -27,33 +27,45 @@ public class NativeSimConnectClient : ISimClient
     private CancellationTokenSource? _cts;
     private Thread? _thread;
 
-    private Microsoft.FlightSimulator.SimConnect.SimConnect? _sc;
-    private IntPtr _hWnd;
-
     public bool IsConnected { get; private set; }
+    public string? LastError { get; private set; }
     public SimData? Latest { get; private set; }
 
     public event EventHandler<SimData>? DataReceived;
     public event EventHandler<bool>? ConnectionChanged;
 
-    // Enum IDs pour SimConnect
-    private enum DataDefinitionId { SimVars }
-    private enum RequestId { SimVarsRequest }
-
-    // Struct miroir des SimVars demandées — l'ordre DOIT matcher les AddToDataDefinition
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    // Struct miroir des SimVars — décoré avec [SimConnect] pour SimConnect.NET
+    [StructLayout(LayoutKind.Sequential)]
     private struct SimVarsStruct
     {
+        [SimConnect("PLANE LATITUDE", "degrees")]
         public double Latitude;
+
+        [SimConnect("PLANE LONGITUDE", "degrees")]
         public double Longitude;
+
+        [SimConnect("PLANE ALTITUDE", "feet")]
         public double AltitudeFt;
+
+        [SimConnect("GROUND VELOCITY", "knots")]
         public double GroundSpeedKts;
+
+        [SimConnect("AIRSPEED INDICATED", "knots")]
         public double IndicatedAirspeedKts;
+
+        [SimConnect("PLANE HEADING DEGREES TRUE", "degrees")]
         public double HeadingDeg;
+
+        [SimConnect("VERTICAL SPEED", "feet per minute")]
         public double VerticalSpeedFpm;
+
+        [SimConnect("FUEL TOTAL QUANTITY", "gallons")]
         public double FuelTotalGal;
-        public int OnGround; // SIMCONNECT bool = int (0 or 1)
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+
+        [SimConnect("SIM ON GROUND")]
+        public double OnGround; // 0 ou 1
+
+        [SimConnect("TITLE", SimConnectDataType.String256)]
         public string AircraftTitle;
     }
 
@@ -78,7 +90,6 @@ public class NativeSimConnectClient : ISimClient
     public Task StopAsync(CancellationToken ct)
     {
         _cts?.Cancel();
-        Disconnect();
         return Task.CompletedTask;
     }
 
@@ -89,9 +100,8 @@ public class NativeSimConnectClient : ISimClient
     }
 
     /// <summary>
-    /// Thread dédié : boucle infinie qui tente de se connecter à SimConnect,
-    /// puis pompe les messages Win32 (GetMessage/DispatchMessage) tant que MSFS tourne.
-    /// Si la connexion est perdue, attend 5s et retente.
+    /// Thread dédié : crée une fenêtre Win32 invisible, connecte SimConnect.NET,
+    /// souscrit aux SimVars à 1 Hz, puis pompe les messages.
     /// </summary>
     private void RunMessagePump()
     {
@@ -99,60 +109,122 @@ public class NativeSimConnectClient : ISimClient
 
         while (_cts is { IsCancellationRequested: false })
         {
+            SimConnectClient? client = null;
+            IntPtr hWnd = IntPtr.Zero;
+            ISimVarSubscription? subscription = null;
+
             try
             {
-                // Crée une fenêtre invisible pour le message pump
-                _hWnd = CreateHiddenWindow();
-                if (_hWnd == IntPtr.Zero)
+                // Fenêtre invisible pour le message pump
+                hWnd = CreateHiddenWindow();
+                if (hWnd == IntPtr.Zero)
                 {
-                    _log.LogError("Failed to create hidden window for SimConnect message pump.");
+                    LastError = "Failed to create hidden window for SimConnect message pump.";
+                    _log.LogError(LastError);
                     Thread.Sleep(5000);
                     continue;
                 }
 
-                // Tentative de connexion SimConnect
-                _sc = new Microsoft.FlightSimulator.SimConnect.SimConnect(
-                    "Thrustline.Bridge", _hWnd, WM_USER_SIMCONNECT, null, 0);
+                client = new SimConnectClient("Thrustline.Bridge");
+                client.AutoReconnectEnabled = false; // On gère nous-mêmes la boucle de retry
 
-                RegisterDataDefinition();
-                RegisterEventHandlers();
+                client.ConnectionStatusChanged += (_, args) =>
+                {
+                    if (args.IsDisconnected)
+                    {
+                        _log.LogWarning("SimConnect disconnected.");
+                        SetConnected(false);
+                    }
+                };
+
+                client.ErrorOccurred += (_, args) =>
+                {
+                    _log.LogWarning("SimConnect error: {Error}", args);
+                };
+
+                // Connexion (bloquant si MSFS pas lancé → exception)
+                client.ConnectAsync(hWnd, WM_USER_SIMCONNECT, 0, _cts.Token)
+                    .GetAwaiter().GetResult();
 
                 SetConnected(true);
+                LastError = null;
                 _log.LogInformation("SimConnect connected to MSFS.");
 
-                // Demande les données à 1 Hz
-                _sc.RequestDataOnSimObject(
-                    RequestId.SimVarsRequest,
-                    DataDefinitionId.SimVars,
-                    Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_OBJECT_ID_USER,
-                    SIMCONNECT_PERIOD.SECOND,
-                    SIMCONNECT_DATA_REQUEST_FLAG.DEFAULT,
-                    0, 0, 0);
+                // Subscription aux SimVars à 1 Hz
+                subscription = client.SimVars.Subscribe<SimVarsStruct>(
+                    SimConnectPeriod.Second,
+                    raw =>
+                    {
+                        var simData = new SimData
+                        {
+                            Latitude = raw.Latitude,
+                            Longitude = raw.Longitude,
+                            AltitudeFt = raw.AltitudeFt,
+                            GroundSpeedKts = raw.GroundSpeedKts,
+                            IndicatedAirspeedKts = raw.IndicatedAirspeedKts,
+                            HeadingDeg = raw.HeadingDeg,
+                            VerticalSpeedFpm = raw.VerticalSpeedFpm,
+                            FuelTotalGal = raw.FuelTotalGal,
+                            OnGround = raw.OnGround != 0,
+                            AircraftTitle = raw.AircraftTitle?.Trim('\0'),
+                        };
 
-                // Message pump loop
+                        Latest = simData;
+                        DataReceived?.Invoke(this, simData);
+                    });
+
+                // Message pump : traite les messages Win32 de SimConnect
                 while (_cts is { IsCancellationRequested: false } && IsConnected)
                 {
-                    // ReceiveMessage déclenche les callbacks enregistrés
-                    _sc.ReceiveMessage();
+                    try
+                    {
+                        client.ProcessNextMessageAsync(_cts.Token)
+                            .GetAwaiter().GetResult();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+
                     Thread.Sleep(_options.PollingIntervalMs);
                 }
             }
-            catch (COMException ex)
+            catch (OperationCanceledException)
             {
-                _log.LogWarning("SimConnect connection failed (MSFS not running?): {Msg}", ex.Message);
-            }
-            catch (BadImageFormatException ex)
-            {
-                _log.LogError(ex, "SimConnect DLL load failed (missing native SimConnect.dll next to exe?). Stopping retries.");
                 break;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is COMException or DllNotFoundException or BadImageFormatException)
             {
+                LastError = $"SimConnect connection failed: {ex.Message}";
+                _log.LogWarning("SimConnect connection failed (MSFS not running?): {Msg}", ex.Message);
+            }
+            catch (SimConnectException ex)
+            {
+                LastError = $"SimConnect error: {ex.Message}";
+                _log.LogWarning("SimConnect error: {Msg}", ex.Message);
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
                 _log.LogError(ex, "SimConnect unexpected error.");
             }
             finally
             {
-                Disconnect();
+                subscription?.Dispose();
+                SetConnected(false);
+
+                if (client is not null)
+                {
+                    try { client.DisconnectAsync().GetAwaiter().GetResult(); }
+                    catch { /* best effort */ }
+                    try { client.Dispose(); }
+                    catch { /* best effort */ }
+                }
+
+                if (hWnd != IntPtr.Zero)
+                {
+                    DestroyWindow(hWnd);
+                }
             }
 
             if (_cts is { IsCancellationRequested: false })
@@ -163,81 +235,6 @@ public class NativeSimConnectClient : ISimClient
         }
 
         _log.LogInformation("NativeSimConnectClient message pump thread exiting.");
-    }
-
-    private void RegisterDataDefinition()
-    {
-        if (_sc is null) return;
-
-        // L'ordre DOIT matcher le struct SimVarsStruct
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "PLANE LATITUDE",            "degrees",          SIMCONNECT_DATATYPE.FLOAT64, 0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "PLANE LONGITUDE",           "degrees",          SIMCONNECT_DATATYPE.FLOAT64, 0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "PLANE ALTITUDE",            "feet",             SIMCONNECT_DATATYPE.FLOAT64, 0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "GPS GROUND SPEED",          "knots",            SIMCONNECT_DATATYPE.FLOAT64, 0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "AIRSPEED INDICATED",        "knots",            SIMCONNECT_DATATYPE.FLOAT64, 0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "PLANE HEADING DEGREES TRUE","degrees",          SIMCONNECT_DATATYPE.FLOAT64, 0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "VERTICAL SPEED",            "feet per minute",  SIMCONNECT_DATATYPE.FLOAT64, 0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "FUEL TOTAL QUANTITY",       "gallons",          SIMCONNECT_DATATYPE.FLOAT64, 0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "SIM ON GROUND",             "bool",             SIMCONNECT_DATATYPE.INT32,   0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-        _sc.AddToDataDefinition(DataDefinitionId.SimVars, "TITLE",                     null,               SIMCONNECT_DATATYPE.STRING256,0, Microsoft.FlightSimulator.SimConnect.SimConnect.SIMCONNECT_UNUSED);
-
-        _sc.RegisterDataDefineStruct<SimVarsStruct>(DataDefinitionId.SimVars);
-    }
-
-    private void RegisterEventHandlers()
-    {
-        if (_sc is null) return;
-
-        _sc.OnRecvSimobjectData += (sender, data) =>
-        {
-            if (data.dwRequestID != (uint)RequestId.SimVarsRequest) return;
-
-            var raw = (SimVarsStruct)data.dwData[0];
-            var simData = new SimData
-            {
-                Latitude = raw.Latitude,
-                Longitude = raw.Longitude,
-                AltitudeFt = raw.AltitudeFt,
-                GroundSpeedKts = raw.GroundSpeedKts,
-                IndicatedAirspeedKts = raw.IndicatedAirspeedKts,
-                HeadingDeg = raw.HeadingDeg,
-                VerticalSpeedFpm = raw.VerticalSpeedFpm,
-                FuelTotalGal = raw.FuelTotalGal,
-                OnGround = raw.OnGround != 0,
-                AircraftTitle = raw.AircraftTitle?.Trim('\0'),
-            };
-
-            Latest = simData;
-            DataReceived?.Invoke(this, simData);
-        };
-
-        _sc.OnRecvQuit += (sender, data) =>
-        {
-            _log.LogWarning("MSFS quit detected via SimConnect.");
-            SetConnected(false);
-        };
-
-        _sc.OnRecvException += (sender, data) =>
-        {
-            _log.LogWarning("SimConnect exception: {Exception} (sendID={SendID})",
-                data.dwException, data.dwSendID);
-        };
-    }
-
-    private void Disconnect()
-    {
-        if (_sc is not null)
-        {
-            try { _sc.Dispose(); } catch { /* best effort */ }
-            _sc = null;
-        }
-        SetConnected(false);
-
-        if (_hWnd != IntPtr.Zero)
-        {
-            DestroyWindow(_hWnd);
-            _hWnd = IntPtr.Zero;
-        }
     }
 
     private void SetConnected(bool value)
@@ -261,7 +258,6 @@ public class NativeSimConnectClient : ISimClient
 
     private static IntPtr CreateHiddenWindow()
     {
-        // HWND_MESSAGE parent = message-only window (invisible, no rendering)
         const uint WS_OVERLAPPED = 0x00000000;
         var hWnd = CreateWindowEx(0, "STATIC", "ThrustlineSimConnect",
             WS_OVERLAPPED, 0, 0, 0, 0,
@@ -269,5 +265,3 @@ public class NativeSimConnectClient : ISimClient
         return hWnd;
     }
 }
-
-#endif

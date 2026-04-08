@@ -9,6 +9,7 @@ public class IdleSimClient : ISimClient
     private readonly ILogger<IdleSimClient> _log;
 
     public bool IsConnected => false;
+    public string? LastError => null;
     public SimData? Latest => null;
 
 #pragma warning disable CS0067 // Events are required by ISimClient but never raised in idle mode

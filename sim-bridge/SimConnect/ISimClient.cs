@@ -10,6 +10,9 @@ public interface ISimClient : IAsyncDisposable
     /// <summary>Connecté au sim ? (false = en attente de MSFS)</summary>
     bool IsConnected { get; }
 
+    /// <summary>Dernière erreur rencontrée, ou null si tout va bien.</summary>
+    string? LastError { get; }
+
     /// <summary>Dernier snapshot reçu, ou null si rien encore.</summary>
     SimData? Latest { get; }
 
