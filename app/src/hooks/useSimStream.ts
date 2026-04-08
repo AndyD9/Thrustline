@@ -101,9 +101,18 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
 
     conn.on("simData", (data: SimData) => {
       // Only mark sim as active when we receive meaningful data
-      // (aircraft loaded in MSFS, not just SimConnect connected idle)
-      const hasRealData = !!data.aircraftTitle && data.aircraftTitle.length > 0;
-      setState((s) => ({ ...s, latest: data, simActive: hasRealData }));
+      // (aircraft loaded in MSFS, not just SimConnect connected idle).
+      // When SimConnect is connected without a flight, all values are 0.
+      const hasRealData =
+        (!!data.aircraftTitle && data.aircraftTitle.trim().length > 0) ||
+        data.latitude !== 0 ||
+        data.longitude !== 0 ||
+        data.fuelTotalGal > 0;
+      setState((s) => ({
+        ...s,
+        latest: hasRealData ? data : s.latest,
+        simActive: hasRealData,
+      }));
     });
 
     conn.on("takeoff", (data: SimData) => {
