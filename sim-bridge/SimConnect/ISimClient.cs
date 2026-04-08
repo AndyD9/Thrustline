@@ -2,12 +2,12 @@ namespace Thrustline.Bridge.SimConnect;
 
 /// <summary>
 /// Abstraction au-dessus du SDK SimConnect Windows.
-/// Permet d'avoir une implémentation Mock (cross-platform, CI, dev macOS)
-/// et une implémentation native (Windows + MSFS 2024).
+/// Implémentations : NativeSimConnectClient (Windows + MSFS 2024)
+/// et IdleSimClient (no-op sur macOS/Linux/CI).
 /// </summary>
 public interface ISimClient : IAsyncDisposable
 {
-    /// <summary>Connecté au sim ? (false = en attente de MSFS ou mode mock)</summary>
+    /// <summary>Connecté au sim ? (false = en attente de MSFS)</summary>
     bool IsConnected { get; }
 
     /// <summary>Dernier snapshot reçu, ou null si rien encore.</summary>

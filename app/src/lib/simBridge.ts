@@ -11,7 +11,7 @@ const BASE_URL = import.meta.env.VITE_SIM_BRIDGE_URL ?? "http://127.0.0.1:5055";
 export interface HealthResponse {
   status: "ok";
   version: string;
-  simConnect: "mock" | "native";
+  simConnect: "idle" | "native";
   supabaseConfigured: boolean;
   hasSession: boolean;
   time: string;
@@ -36,34 +36,6 @@ export async function clearSession(): Promise<void> {
   const res = await fetch(`${BASE_URL}/session`, { method: "DELETE" });
   if (!res.ok && res.status !== 204) {
     throw new Error(`sim-bridge /session DELETE → ${res.status}`);
-  }
-}
-
-/** Trigger a mock flight with dispatch parameters. No-op if sim-bridge is in native mode. */
-export async function startMockFlight(params: {
-  originIcao: string;
-  destIcao: string;
-  icaoType: string;
-  originLat: number;
-  originLon: number;
-  originElevFt: number;
-  destLat: number;
-  destLon: number;
-  destElevFt: number;
-  cruiseAltFt: number;
-  cruiseSpeedKts: number;
-  fuelGal: number;
-  durationSeconds: number;
-  waypoints?: { lat: number; lon: number }[];
-}): Promise<void> {
-  try {
-    await fetch(`${BASE_URL}/mock/start-flight`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
-    });
-  } catch {
-    // Silently ignore — endpoint doesn't exist in native mode
   }
 }
 

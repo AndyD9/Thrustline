@@ -52,7 +52,7 @@ export interface AchievementPayload {
 export interface SimStreamState {
   /** sim-bridge service reachable via SignalR */
   connected: boolean;
-  /** MSFS itself is running & sending data (vs just sim-bridge being up in mock mode) */
+  /** MSFS itself is running & sending data */
   simActive: boolean;
   latest: SimData | null;
   lastTakeoff: SimData | null;

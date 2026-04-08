@@ -45,18 +45,11 @@ builder.Services.AddSingleton<LandingProcessor>();
 
 // --- SimConnect layer ---
 builder.Services.AddSingleton<FlightDetector>();
-if (simBridgeConfig.UseMockSimConnect || !OperatingSystem.IsWindows())
-{
-    builder.Services.AddSingleton<ISimClient, MockSimClient>();
-}
-else
-{
 #if HAS_SIMCONNECT
-    builder.Services.AddSingleton<ISimClient, NativeSimConnectClient>();
+builder.Services.AddSingleton<ISimClient, NativeSimConnectClient>();
 #else
-    builder.Services.AddSingleton<ISimClient, MockSimClient>();
+builder.Services.AddSingleton<ISimClient, IdleSimClient>();
 #endif
-}
 builder.Services.AddHostedService<SimConnectWorker>();
 
 // --- SignalR (real-time sim stream towards the React front) ---
@@ -87,7 +80,11 @@ app.MapGet("/health", (ISupabaseClientProvider supabase, ISessionStore session) 
 {
     status = "ok",
     version = "0.1.0",
-    simConnect = simBridgeConfig.UseMockSimConnect ? "mock" : "native",
+#if HAS_SIMCONNECT
+    simConnect = "native",
+#else
+    simConnect = "idle",
+#endif
     supabaseConfigured = supabase.IsConfigured,
     hasSession = session.HasSession,
     time = DateTimeOffset.UtcNow
@@ -108,39 +105,6 @@ app.MapDelete("/session", (ISessionStore session) =>
     session.Clear();
     return Results.NoContent();
 });
-
-// --- Mock flight trigger (only in mock mode) ---
-if (simBridgeConfig.UseMockSimConnect || !OperatingSystem.IsWindows())
-{
-    app.MapPost("/mock/start-flight", (MockFlightPayload payload, ISimClient client) =>
-    {
-        if (client is not MockSimClient mock)
-            return Results.BadRequest(new { error = "Not in mock mode" });
-
-        var waypoints = payload.Waypoints?
-            .Select(w => new LatLon(w.Lat, w.Lon))
-            .ToList() ?? new List<LatLon>();
-
-        mock.StartFlight(new MockFlightPlan
-        {
-            OriginIcao = payload.OriginIcao,
-            DestIcao = payload.DestIcao,
-            IcaoType = payload.IcaoType,
-            OriginLat = payload.OriginLat,
-            OriginLon = payload.OriginLon,
-            OriginElevFt = payload.OriginElevFt,
-            DestLat = payload.DestLat,
-            DestLon = payload.DestLon,
-            DestElevFt = payload.DestElevFt,
-            CruiseAltFt = payload.CruiseAltFt,
-            CruiseSpeedKts = payload.CruiseSpeedKts,
-            FuelGal = payload.FuelGal,
-            DurationSeconds = payload.DurationSeconds > 0 ? payload.DurationSeconds : 120,
-            Waypoints = waypoints,
-        });
-        return Results.Ok(new { status = "mock flight started" });
-    });
-}
 
 // --- Weather proxy (avoids CORS issues with aviationweather.gov) ---
 var httpClient = new HttpClient();
@@ -181,7 +145,6 @@ app.Run();
 
 public class SimBridgeOptions
 {
-    public bool UseMockSimConnect { get; set; } = false;
     public int PollingIntervalMs { get; set; } = 1000;
     public int GroundDebounceSeconds { get; set; } = 5;
 }
@@ -201,22 +164,3 @@ public class SupabaseOptions
 }
 
 public record SessionPayload(Guid UserId);
-
-public record MockWaypointPayload(double Lat, double Lon);
-
-public record MockFlightPayload(
-    string OriginIcao,
-    string DestIcao,
-    string IcaoType,
-    double OriginLat,
-    double OriginLon,
-    double OriginElevFt,
-    double DestLat,
-    double DestLon,
-    double DestElevFt,
-    double CruiseAltFt,
-    double CruiseSpeedKts,
-    double FuelGal,
-    double DurationSeconds,
-    List<MockWaypointPayload>? Waypoints
-);
