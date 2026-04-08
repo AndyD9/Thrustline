@@ -6,6 +6,13 @@ using Thrustline.Bridge.SimConnect;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// --- Kestrel: bind to localhost:5055 (hardcoded so the sidecar works
+//     even without appsettings.json next to the single-file exe) ---
+builder.WebHost.ConfigureKestrel(k =>
+{
+    k.ListenLocalhost(5055);
+});
+
 // --- Configuration ---
 // Charge user-secrets inconditionnellement (pas seulement en Development) afin que
 // `dotnet user-secrets set "Supabase:Url" ...` marche quelle que soit la façon dont
