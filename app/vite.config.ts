@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
-// @ts-expect-error process is a node builtin injected by Vite at config time
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig(async () => ({
