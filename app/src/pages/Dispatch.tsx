@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Select } from "@/components/Select";
-import { Plane, Plus, X, Play, Ban, Radio, Users, Mountain, AlertTriangle, ExternalLink, Download, Loader2, FileText } from "lucide-react";
-import type { Aircraft, Dispatch as DispatchT, DispatchStatus } from "@/lib/database.types";
+import { Plane, Plus, X, Play, Ban, Radio, Users, Mountain, AlertTriangle, ExternalLink, Download, Loader2, FileText, Megaphone, Tag } from "lucide-react";
+import type { Aircraft, Dispatch as DispatchT, DispatchStatus, MarketingCampaign, Route as RouteT } from "@/lib/database.types";
 import AirportPicker from "@/components/AirportPicker";
 import FlightMap from "@/components/FlightMap";
 import { airportByIcao } from "@/data/airports";
@@ -302,6 +302,11 @@ function NewDispatchForm({
   const [ofp, setOfp] = useState<SimBriefOFP | null>(null);
   const [importingOFP, setImportingOFP] = useState(false);
 
+  // Company management integration
+  const [routePriceModifier, setRoutePriceModifier] = useState(1.0);
+  const [activeCampaigns, setActiveCampaigns] = useState<MarketingCampaign[]>([]);
+  const [campaignMultiplier, setCampaignMultiplier] = useState(1.0);
+
   // Derived
   const originApt = airportByIcao[originIcao];
   const destApt = airportByIcao[destIcao];
@@ -313,9 +318,17 @@ function NewDispatchForm({
   const cruiseSpeed = acType?.cruiseSpeedKts ?? 450;
   const outOfRange = routeDistanceNm !== null && acType && routeDistanceNm > acType.rangeNm;
 
-  // Fetch reputation for this route
+  // Fetch reputation, route pricing, and active campaigns for this route
   useEffect(() => {
-    if (!originIcao || !destIcao) { setRepScore(50); return; }
+    if (!originIcao || !destIcao) {
+      setRepScore(50);
+      setRoutePriceModifier(1.0);
+      setActiveCampaigns([]);
+      setCampaignMultiplier(1.0);
+      return;
+    }
+
+    // Reputation
     supabase
       .from("reputations")
       .select("score")
@@ -324,11 +337,44 @@ function NewDispatchForm({
       .eq("dest_icao", destIcao)
       .maybeSingle()
       .then(({ data }) => setRepScore(data?.score ?? 50));
+
+    // Route price modifier
+    supabase
+      .from("routes")
+      .select("price_modifier")
+      .eq("company_id", companyId)
+      .eq("origin_icao", originIcao)
+      .eq("dest_icao", destIcao)
+      .maybeSingle()
+      .then(({ data }) => setRoutePriceModifier(data?.price_modifier ?? 1.0))
+      .catch(() => setRoutePriceModifier(1.0));
+
+    // Active marketing campaigns affecting this route
+    const routeKey = `${originIcao}-${destIcao}`;
+    supabase
+      .from("marketing_campaigns")
+      .select("*")
+      .eq("company_id", companyId)
+      .gt("expires_at", new Date().toISOString())
+      .then(({ data }) => {
+        const campaigns = (data as MarketingCampaign[]) ?? [];
+        const matching = campaigns.filter(
+          (c) => c.scope === "global" || (c.scope === "route" && c.target_route === routeKey)
+        );
+        setActiveCampaigns(matching);
+        const mult = matching.reduce((m, c) => m * c.demand_multiplier, 1.0);
+        setCampaignMultiplier(mult);
+      })
+      .catch(() => { setActiveCampaigns([]); setCampaignMultiplier(1.0); });
   }, [originIcao, destIcao, companyId]);
 
-  // Dynamic pax demand
+  // Dynamic pax demand (with pricing & campaign effects)
   const demand = originApt && destApt && acType && routeDistanceNm
-    ? computePaxDemand({ origin: originApt, dest: destApt, aircraftType: acType, distanceNm: routeDistanceNm, reputationScore: repScore })
+    ? computePaxDemand({
+        origin: originApt, dest: destApt, aircraftType: acType,
+        distanceNm: routeDistanceNm, reputationScore: repScore,
+        campaignMultiplier, priceModifier: routePriceModifier,
+      })
     : null;
 
   // Auto-fill pax from dynamic demand (or fallback to max)
@@ -342,7 +388,10 @@ function NewDispatchForm({
       return;
     }
     const dist = Math.round(haversineNm(o.lat, o.lon, d.lat, d.lon));
-    const demand = computePaxDemand({ origin: o, dest: d, aircraftType: type, distanceNm: dist });
+    const demand = computePaxDemand({
+      origin: o, dest: d, aircraftType: type, distanceNm: dist,
+      campaignMultiplier, priceModifier: routePriceModifier,
+    });
     setPaxEco(String(demand.eco));
     setPaxBiz(String(demand.biz));
   };
@@ -449,6 +498,38 @@ function NewDispatchForm({
       </div>
 
       {/* ── Step 3: Load ─────────────────────────────── */}
+
+      {/* Active campaigns & pricing affecting this route */}
+      {originIcao && destIcao && (activeCampaigns.length > 0 || routePriceModifier !== 1.0) && (
+        <div className="space-y-1.5">
+          {routePriceModifier !== 1.0 && (
+            <div className={`flex items-center gap-2 text-xs ${routePriceModifier > 1 ? "text-amber-400" : "text-blue-400"}`}>
+              <Tag className="h-3.5 w-3.5" />
+              {routePriceModifier > 1 ? "Premium" : "Discount"} pricing active
+              <span className="font-mono font-bold">
+                {routePriceModifier > 1 ? "+" : ""}{Math.round((routePriceModifier - 1) * 100)}% price
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="text-slate-500">
+                {routePriceModifier > 1 ? "Higher revenue, fewer pax" : "Lower revenue, more pax"}
+              </span>
+            </div>
+          )}
+          {activeCampaigns.map((c) => {
+            const remaining = Math.max(0, Math.ceil((new Date(c.expires_at).getTime() - Date.now()) / 86400000));
+            return (
+              <div key={c.id} className="flex items-center gap-2 text-xs text-brand-300">
+                <Megaphone className="h-3.5 w-3.5" />
+                {c.campaign_type.replace("_", " ")}
+                <span className="font-mono font-bold">+{Math.round((c.demand_multiplier - 1) * 100)}% demand</span>
+                <span className="text-slate-600">·</span>
+                <span className="text-slate-500">{remaining}d remaining</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {demand && (
         <div className={`flex items-center gap-2 text-xs ${
           demand.loadFactor >= 0.80 ? "text-emerald-400" :
@@ -463,6 +544,15 @@ function NewDispatchForm({
           <span className={repScore >= 70 ? "text-emerald-400" : repScore >= 40 ? "text-amber-400" : "text-red-400"}>
             Rep: {repScore}/100 ({(0.5 + repScore / 100).toFixed(1)}x)
           </span>
+          {campaignMultiplier > 1 && (
+            <>
+              <span className="text-slate-600">·</span>
+              <span className="text-brand-300">
+                <Megaphone className="mr-1 inline h-3 w-3" />
+                +{Math.round((campaignMultiplier - 1) * 100)}%
+              </span>
+            </>
+          )}
         </div>
       )}
       <div className="grid grid-cols-3 gap-4">
