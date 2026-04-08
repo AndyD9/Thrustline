@@ -23,3 +23,20 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Build artifacts
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+
+# .NET
+sim-bridge/bin/
+sim-bridge/obj/
+sim-bridge/publish/
+
+# Tauri
+app/src-tauri/target/
+app/src-tauri/binaries/
+
+# Claude worktrees
+.claude/worktrees/
