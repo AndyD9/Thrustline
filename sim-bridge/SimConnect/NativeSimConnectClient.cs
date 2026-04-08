@@ -141,6 +141,11 @@ public class NativeSimConnectClient : ISimClient
             {
                 _log.LogWarning("SimConnect connection failed (MSFS not running?): {Msg}", ex.Message);
             }
+            catch (BadImageFormatException ex)
+            {
+                _log.LogError(ex, "SimConnect DLL load failed (missing native SimConnect.dll next to exe?). Stopping retries.");
+                break;
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _log.LogError(ex, "SimConnect unexpected error.");

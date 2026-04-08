@@ -7,8 +7,6 @@
     <RootNamespace>Thrustline.Bridge</RootNamespace>
     <AssemblyName>sim-bridge</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <!-- SimConnect SDK is x64-only; force platform to avoid BadImageFormatException -->
-    <PlatformTarget>x64</PlatformTarget>
     <UserSecretsId>e289fb10-9806-4a52-bbef-50dcfb24d6f9</UserSecretsId>
   </PropertyGroup>
 
@@ -24,7 +22,7 @@
        Sur Windows, set MSFS_SDK env var vers le dossier SDK installé.
        Le flag HAS_SIMCONNECT est UNIQUEMENT défini quand la DLL est trouvée,
        ce qui conditionne la compilation de NativeSimConnectClient.cs.
-       Si la DLL n'est pas là, le build réussit en mock only. -->
+       Si la DLL n'est pas là, le build réussit en idle mode. -->
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT' AND Exists('$(MSFS_SDK)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">
     <DefineConstants>$(DefineConstants);HAS_SIMCONNECT</DefineConstants>
   </PropertyGroup>
@@ -33,8 +31,6 @@
     <Reference Include="Microsoft.FlightSimulator.SimConnect">
       <HintPath>$(MSFS_SDK)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll</HintPath>
       <Private>true</Private>
-      <!-- Mixed-mode (C++/CLI) assembly — must NOT be embedded in single-file bundle -->
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Reference>
   </ItemGroup>
 

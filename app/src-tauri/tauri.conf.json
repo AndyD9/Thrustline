@@ -37,10 +37,6 @@
     ],
     "externalBin": [
       "binaries/sim-bridge"
-    ],
-    "resources": [
-      "binaries/Microsoft.FlightSimulator.SimConnect.dll",
-      "binaries/SimConnect.dll"
     ]
   },
   "plugins": {}
