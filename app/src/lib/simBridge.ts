@@ -8,6 +8,24 @@
 
 const BASE_URL = import.meta.env.VITE_SIM_BRIDGE_URL ?? "http://127.0.0.1:5055";
 
+/** Tracks whether the sim-bridge is reachable to avoid spamming failed requests. */
+let bridgeReachable = false;
+let probeInFlight = false;
+
+async function probeBridge(): Promise<boolean> {
+  if (probeInFlight) return bridgeReachable;
+  probeInFlight = true;
+  try {
+    const res = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(2000) });
+    bridgeReachable = res.ok;
+  } catch {
+    bridgeReachable = false;
+  } finally {
+    probeInFlight = false;
+  }
+  return bridgeReachable;
+}
+
 export interface HealthResponse {
   status: "ok";
   version: string;
@@ -20,10 +38,12 @@ export interface HealthResponse {
 export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
   const res = await fetch(`${BASE_URL}/health`, { signal });
   if (!res.ok) throw new Error(`sim-bridge /health → ${res.status}`);
+  bridgeReachable = true;
   return res.json();
 }
 
 export async function setSession(userId: string): Promise<void> {
+  if (!bridgeReachable && !(await probeBridge())) return;
   const res = await fetch(`${BASE_URL}/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -33,6 +53,7 @@ export async function setSession(userId: string): Promise<void> {
 }
 
 export async function clearSession(): Promise<void> {
+  if (!bridgeReachable && !(await probeBridge())) return;
   const res = await fetch(`${BASE_URL}/session`, { method: "DELETE" });
   if (!res.ok && res.status !== 204) {
     throw new Error(`sim-bridge /session DELETE → ${res.status}`);

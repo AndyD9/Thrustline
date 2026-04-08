@@ -5,7 +5,7 @@ import {
   HubConnectionState,
   LogLevel,
 } from "@microsoft/signalr";
-import { SIM_HUB_URL } from "@/lib/simBridge";
+import { SIM_HUB_URL, waitForBridge } from "@/lib/simBridge";
 
 export interface SimData {
   timestamp: string;
@@ -91,71 +91,80 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
   onLandingRef.current = onLanding;
 
   useEffect(() => {
-    const conn = new HubConnectionBuilder()
-      .withUrl(SIM_HUB_URL)
-      .withAutomaticReconnect([0, 2_000, 5_000, 10_000, 10_000])
-      .configureLogging(LogLevel.Warning)
-      .build();
+    let cancelled = false;
 
-    connRef.current = conn;
+    async function connect() {
+      // Wait for sim-bridge to be reachable before attempting SignalR connection.
+      // This avoids spamming ERR_CONNECTION_REFUSED in the console during dev without sim-bridge.
+      const ready = await waitForBridge(3, 3_000);
+      if (!ready || cancelled) return;
 
-    conn.on("simData", (data: SimData) => {
-      // Only mark sim as active when we receive meaningful data
-      // (aircraft loaded in MSFS, not just SimConnect connected idle).
-      // When SimConnect is connected without a flight, all values are 0.
-      const hasRealData =
-        (!!data.aircraftTitle && data.aircraftTitle.trim().length > 0) ||
-        data.latitude !== 0 ||
-        data.longitude !== 0 ||
-        data.fuelTotalGal > 0;
-      setState((s) => ({
-        ...s,
-        latest: hasRealData ? data : s.latest,
-        simActive: hasRealData,
-      }));
-    });
+      const conn = new HubConnectionBuilder()
+        .withUrl(SIM_HUB_URL)
+        .withAutomaticReconnect([0, 2_000, 5_000, 10_000, 10_000])
+        .configureLogging(LogLevel.Warning)
+        .build();
 
-    conn.on("takeoff", (data: SimData) => {
-      setState((s) => ({ ...s, lastTakeoff: data, lastLanding: null, acarsLog: [], currentPhase: "takeoff" }));
-    });
+      if (cancelled) return;
+      connRef.current = conn;
 
-    conn.on("landing", (evt: LandingEventPayload) => {
-      setState((s) => ({ ...s, lastLanding: evt }));
-      onLandingRef.current?.(evt);
-    });
+      conn.on("simData", (data: SimData) => {
+        const hasRealData =
+          (!!data.aircraftTitle && data.aircraftTitle.trim().length > 0) ||
+          data.latitude !== 0 ||
+          data.longitude !== 0 ||
+          data.fuelTotalGal > 0;
+        setState((s) => ({
+          ...s,
+          latest: hasRealData ? data : s.latest,
+          simActive: hasRealData,
+        }));
+      });
 
-    conn.on("acarsUpdate", (report: AcarsUpdatePayload) => {
-      setState((s) => ({ ...s, acarsLog: [...s.acarsLog.slice(-499), report] }));
-    });
+      conn.on("takeoff", (data: SimData) => {
+        setState((s) => ({ ...s, lastTakeoff: data, lastLanding: null, acarsLog: [], currentPhase: "takeoff" }));
+      });
 
-    conn.on("phaseChange", (phase: string) => {
-      setState((s) => ({ ...s, currentPhase: phase }));
-    });
+      conn.on("landing", (evt: LandingEventPayload) => {
+        setState((s) => ({ ...s, lastLanding: evt }));
+        onLandingRef.current?.(evt);
+      });
 
-    conn.on("achievementUnlocked", (achievement: AchievementPayload) => {
-      setState((s) => ({ ...s, latestAchievement: achievement }));
-    });
+      conn.on("acarsUpdate", (report: AcarsUpdatePayload) => {
+        setState((s) => ({ ...s, acarsLog: [...s.acarsLog.slice(-499), report] }));
+      });
 
-    conn.on("connectionChanged", (connected: boolean) => {
-      // SimConnect connection status — if disconnected, sim is definitely not active
-      if (!connected) {
-        setState((s) => ({ ...s, simActive: false }));
-      }
-      // If connected, wait for actual simData with aircraft title before setting simActive
-    });
+      conn.on("phaseChange", (phase: string) => {
+        setState((s) => ({ ...s, currentPhase: phase }));
+      });
 
-    conn.onreconnecting(() => setState((s) => ({ ...s, connected: false })));
-    conn.onreconnected(() => setState((s) => ({ ...s, connected: true })));
-    conn.onclose(() => setState((s) => ({ ...s, connected: false, simActive: false })));
+      conn.on("achievementUnlocked", (achievement: AchievementPayload) => {
+        setState((s) => ({ ...s, latestAchievement: achievement }));
+      });
 
-    conn
-      .start()
-      .then(() => setState((s) => ({ ...s, connected: true })))
-      // eslint-disable-next-line no-console
-      .catch((err) => console.warn("[useSimStream] initial connect failed:", err));
+      conn.on("connectionChanged", (connected: boolean) => {
+        if (!connected) {
+          setState((s) => ({ ...s, simActive: false }));
+        }
+      });
+
+      conn.onreconnecting(() => setState((s) => ({ ...s, connected: false })));
+      conn.onreconnected(() => setState((s) => ({ ...s, connected: true })));
+      conn.onclose(() => setState((s) => ({ ...s, connected: false, simActive: false })));
+
+      conn
+        .start()
+        .then(() => setState((s) => ({ ...s, connected: true })))
+        // eslint-disable-next-line no-console
+        .catch((err) => console.warn("[useSimStream] initial connect failed:", err));
+    }
+
+    connect();
 
     return () => {
-      if (conn.state !== HubConnectionState.Disconnected) {
+      cancelled = true;
+      const conn = connRef.current;
+      if (conn && conn.state !== HubConnectionState.Disconnected) {
         conn.stop().catch(() => {});
       }
       connRef.current = null;
