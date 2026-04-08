@@ -100,7 +100,10 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
     connRef.current = conn;
 
     conn.on("simData", (data: SimData) => {
-      setState((s) => ({ ...s, latest: data, simActive: true }));
+      // Only mark sim as active when we receive meaningful data
+      // (aircraft loaded in MSFS, not just SimConnect connected idle)
+      const hasRealData = !!data.aircraftTitle && data.aircraftTitle.length > 0;
+      setState((s) => ({ ...s, latest: data, simActive: hasRealData }));
     });
 
     conn.on("takeoff", (data: SimData) => {
@@ -125,7 +128,11 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
     });
 
     conn.on("connectionChanged", (connected: boolean) => {
-      setState((s) => ({ ...s, simActive: connected }));
+      // SimConnect connection status — if disconnected, sim is definitely not active
+      if (!connected) {
+        setState((s) => ({ ...s, simActive: false }));
+      }
+      // If connected, wait for actual simData with aircraft title before setting simActive
     });
 
     conn.onreconnecting(() => setState((s) => ({ ...s, connected: false })));
