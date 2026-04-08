@@ -33,8 +33,18 @@ if (-not (Test-Path $TargetDir)) {
 }
 
 # Copie le binaire
-$PublishedExe = Join-Path (Join-Path $BridgeDir "publish") "sim-bridge.exe"
+$PublishDir  = Join-Path $BridgeDir "publish"
+$PublishedExe = Join-Path $PublishDir "sim-bridge.exe"
 Copy-Item $PublishedExe $TargetFile -Force
+
+# Copie la DLL SimConnect native (requise à côté de l'exe, non embarquable en single-file)
+$SimConnectDll = Join-Path $PublishDir "Microsoft.FlightSimulator.SimConnect.dll"
+if (Test-Path $SimConnectDll) {
+    Copy-Item $SimConnectDll $TargetDir -Force
+    Write-Host "SimConnect DLL copied to binaries/" -ForegroundColor Yellow
+} else {
+    Write-Host "WARNING: SimConnect DLL not found in publish output — sidecar will run in mock mode" -ForegroundColor Yellow
+}
 
 $Size = [math]::Round((Get-Item $TargetFile).Length / 1MB, 1)
 Write-Host "=== Sidecar ready: $TargetFile ($Size MB) ===" -ForegroundColor Green
