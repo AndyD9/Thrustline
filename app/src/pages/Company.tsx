@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
 import { PARTNERS, MAX_ACTIVE_PARTNERSHIPS } from "@/lib/partnerships";
 import { CAMPAIGNS, campaignTotalCost } from "@/lib/campaigns";
-import type { Partnership, MarketingCampaign, Route } from "@/lib/database.types";
+import type { Partnership, MarketingCampaign, Route, Flight } from "@/lib/database.types";
 import type { LucideIcon } from "lucide-react";
 import {
   Building2,
@@ -49,18 +49,38 @@ export default function Company() {
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [campaignRoute, setCampaignRoute] = useState<string>("");
 
+  // Derived route pairs from flights (for campaign route picker)
+  const [flightRoutes, setFlightRoutes] = useState<{ key: string; origin: string; dest: string }[]>([]);
+
   const loadData = useCallback(async () => {
     if (!company) return;
     setLoading(true);
-    const [pRes, cRes, rRes] = await Promise.all([
-      supabase.from("partnerships").select("*").eq("company_id", company.id),
+
+    // Query each table independently so a 404 on one doesn't break the others
+    const [pRes, cRes, rRes, fRes] = await Promise.all([
+      supabase.from("partnerships").select("*").eq("company_id", company.id).then(r => r).catch(() => ({ data: null })),
       supabase.from("marketing_campaigns").select("*").eq("company_id", company.id)
-        .gt("expires_at", new Date().toISOString()).order("expires_at", { ascending: true }),
-      supabase.from("routes").select("*").eq("company_id", company.id).eq("active", true),
+        .gt("expires_at", new Date().toISOString()).order("expires_at", { ascending: true }).then(r => r).catch(() => ({ data: null })),
+      supabase.from("routes").select("*").eq("company_id", company.id).eq("active", true).then(r => r).catch(() => ({ data: null })),
+      supabase.from("flights").select("departure_icao,arrival_icao").eq("company_id", company.id).then(r => r).catch(() => ({ data: null })),
     ]);
+
     setPartnerships((pRes.data as Partnership[]) ?? []);
     setCampaigns((cRes.data as MarketingCampaign[]) ?? []);
     setRoutes((rRes.data as Route[]) ?? []);
+
+    // Derive unique route pairs from flights for the campaign route picker
+    const flights = (fRes.data as Pick<Flight, "departure_icao" | "arrival_icao">[]) ?? [];
+    const seen = new Set<string>();
+    const derived: { key: string; origin: string; dest: string }[] = [];
+    for (const f of flights) {
+      const key = `${f.departure_icao}-${f.arrival_icao}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        derived.push({ key, origin: f.departure_icao, dest: f.arrival_icao });
+      }
+    }
+    setFlightRoutes(derived);
     setLoading(false);
   }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -136,6 +156,30 @@ export default function Company() {
     loadData();
   };
 
+  // Cancel campaign (refund remaining days)
+  const cancelCampaign = async (campaign: MarketingCampaign) => {
+    const remaining = Math.max(0, Math.ceil((new Date(campaign.expires_at).getTime() - Date.now()) / 86400000));
+    const refund = Math.round(campaign.daily_cost * remaining);
+
+    // Delete campaign
+    await supabase.from("marketing_campaigns").delete().eq("id", campaign.id);
+
+    // Refund remaining cost
+    if (refund > 0) {
+      await supabase.from("companies").update({ capital: company.capital + refund }).eq("id", company.id);
+      await supabase.from("transactions").insert({
+        user_id: company.user_id,
+        company_id: company.id,
+        type: "revenue",
+        amount: refund,
+        description: `Campaign cancelled: ${campaign.campaign_type.replace("_", " ")} — ${remaining}d refund`,
+      });
+    }
+
+    refetch();
+    loadData();
+  };
+
   // Update route pricing
   const updatePricing = async (routeId: string, modifier: number) => {
     await supabase.from("routes").update({ price_modifier: modifier }).eq("id", routeId);
@@ -204,9 +248,18 @@ export default function Company() {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-mono text-xs text-brand-300">{remaining}d left</div>
-                    <div className="text-[10px] text-slate-500">{currency(c.daily_cost)}/day</div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="font-mono text-xs text-brand-300">{remaining}d left</div>
+                      <div className="text-[10px] text-slate-500">{currency(c.daily_cost)}/day</div>
+                    </div>
+                    <button
+                      onClick={() => cancelCampaign(c)}
+                      className="rounded-lg bg-red-500/15 px-2.5 py-1.5 text-[10px] font-bold text-red-400 transition-all hover:bg-red-500/25"
+                      title={`Cancel & refund ~${currency(Math.round(c.daily_cost * remaining))}`}
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               );
@@ -259,9 +312,9 @@ export default function Company() {
                   className="mt-1 w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-sm text-white"
                 >
                   <option value="">Select a route...</option>
-                  {routes.map((r) => (
-                    <option key={r.id} value={`${r.origin_icao}-${r.dest_icao}`}>
-                      {r.origin_icao} → {r.dest_icao}
+                  {flightRoutes.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.origin} → {r.dest}
                     </option>
                   ))}
                 </select>
