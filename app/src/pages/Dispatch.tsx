@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Select } from "@/components/Select";
 import { Plane, Plus, X, Play, Ban, Radio, Users, Mountain, AlertTriangle, ExternalLink, Download, Loader2, FileText } from "lucide-react";
 import type { Aircraft, Dispatch as DispatchT, DispatchStatus } from "@/lib/database.types";
 import AirportPicker from "@/components/AirportPicker";
@@ -422,17 +423,15 @@ function NewDispatchForm({
       <div>
         <label className="block">
           <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">Aircraft</span>
-          <select
+          <Select
             value={aircraftId}
-            onChange={(e) => onAircraftChange(e.target.value)}
-            required
-            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-brand-400/50"
-          >
-            <option value="">Select aircraft...</option>
-            {aircraft.map((ac) => (
-              <option key={ac.id} value={ac.id}>{ac.name} ({ac.icao_type})</option>
-            ))}
-          </select>
+            onChange={onAircraftChange}
+            placeholder="Select aircraft..."
+            options={aircraft.map((ac) => ({
+              value: ac.id,
+              label: `${ac.name} (${ac.icao_type})`,
+            }))}
+          />
         </label>
 
         {/* Aircraft specs pills */}

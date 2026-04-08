@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Select } from "@/components/Select";
 import { Plane, Wrench, Clock, Hash, Plus, X, ChevronRight, Download, Loader2 } from "lucide-react";
 import type { Aircraft } from "@/lib/database.types";
 import AircraftTypePicker from "@/components/AircraftTypePicker";
@@ -334,14 +335,14 @@ function AddAircraftForm({
           <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">
             Ownership
           </span>
-          <select
+          <Select
             value={ownership}
-            onChange={(e) => setOwnership(e.target.value as "leased" | "owned")}
-            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-brand-400/50"
-          >
-            <option value="leased">Leased</option>
-            <option value="owned">Owned</option>
-          </select>
+            onChange={(v) => setOwnership(v as "leased" | "owned")}
+            options={[
+              { value: "leased", label: "Leased" },
+              { value: "owned", label: "Owned" },
+            ]}
+          />
         </label>
         {ownership === "leased" ? (
           <ReadOnlyField label="Lease cost / mo" value={`$${Number(leaseCost).toLocaleString()}`} />

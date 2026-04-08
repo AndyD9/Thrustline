@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Select } from "@/components/Select";
 import { Users, Plus, X, Shield, RefreshCw, Bed, Zap, UserPlus, Briefcase, Clock } from "lucide-react";
 import type { Aircraft, CrewMember, CrewRank, CrewStatus } from "@/lib/database.types";
 import { generateCandidates, type CrewCandidate } from "@/lib/crewGen";
@@ -138,16 +139,15 @@ export default function Crew() {
                 {/* Middle: stats */}
                 <div className="flex items-center gap-6">
                   {/* Aircraft assignment */}
-                  <select
+                  <Select
                     value={c.aircraft_id ?? ""}
-                    onChange={(e) => void assignAircraft(c.id, e.target.value || null)}
-                    className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-brand-400/50"
-                  >
-                    <option value="">Unassigned</option>
-                    {aircraft.map((ac) => (
-                      <option key={ac.id} value={ac.id}>{ac.name}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => void assignAircraft(c.id, v || null)}
+                    placeholder="Unassigned"
+                    options={[
+                      { value: "", label: "Unassigned" },
+                      ...aircraft.map((ac) => ({ value: ac.id, label: ac.name })),
+                    ]}
+                  />
 
                   <div className="text-center">
                     <div className="text-[10px] uppercase tracking-wider text-slate-500">XP</div>

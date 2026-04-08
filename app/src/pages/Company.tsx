@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Select } from "@/components/Select";
 import { PARTNERS, MAX_ACTIVE_PARTNERSHIPS } from "@/lib/partnerships";
 import { CAMPAIGNS, campaignTotalCost } from "@/lib/campaigns";
 import type { Partnership, MarketingCampaign, Route, Flight } from "@/lib/database.types";
@@ -306,18 +307,16 @@ export default function Company() {
             {selectedCampaign && CAMPAIGNS.find((c) => c.type === selectedCampaign)?.scope === "route" && (
               <div className="mt-4">
                 <label className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Target Route</label>
-                <select
+                <Select
                   value={campaignRoute}
-                  onChange={(e) => setCampaignRoute(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[#0c1220] px-3 py-2 text-sm text-white [&>option]:bg-[#0c1220] [&>option]:text-white"
-                >
-                  <option value="">Select a route...</option>
-                  {flightRoutes.map((r) => (
-                    <option key={r.key} value={r.key}>
-                      {r.origin} → {r.dest}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCampaignRoute}
+                  placeholder="Select a route..."
+                  className="mt-1"
+                  options={flightRoutes.map((r) => ({
+                    value: r.key,
+                    label: `${r.origin} → ${r.dest}`,
+                  }))}
+                />
               </div>
             )}
             <div className="mt-4 flex gap-3">

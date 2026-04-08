@@ -135,6 +135,38 @@ if (simBridgeConfig.UseMockSimConnect || !OperatingSystem.IsWindows())
     });
 }
 
+// --- Weather proxy (avoids CORS issues with aviationweather.gov) ---
+var httpClient = new HttpClient();
+httpClient.DefaultRequestHeaders.Add("User-Agent", "Thrustline/1.0");
+
+app.MapGet("/weather/metar/{icao}", async (string icao) =>
+{
+    try
+    {
+        var url = $"https://aviationweather.gov/api/data/metar?ids={icao}&format=raw&taf=false";
+        var text = (await httpClient.GetStringAsync(url)).Trim();
+        return string.IsNullOrEmpty(text) ? Results.NotFound() : Results.Ok(new { raw = text });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Weather fetch failed: {ex.Message}");
+    }
+});
+
+app.MapGet("/weather/taf/{icao}", async (string icao) =>
+{
+    try
+    {
+        var url = $"https://aviationweather.gov/api/data/taf?ids={icao}&format=raw";
+        var text = (await httpClient.GetStringAsync(url)).Trim();
+        return string.IsNullOrEmpty(text) ? Results.NotFound() : Results.Ok(new { raw = text });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Weather fetch failed: {ex.Message}");
+    }
+});
+
 // --- SignalR hub ---
 app.MapHub<SimHub>("/hubs/sim");
 
