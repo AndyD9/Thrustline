@@ -47,6 +47,14 @@ body {
     sans-serif;
   background: var(--color-surface-0);
   color: #e2e8f0;
+  color-scheme: dark;
+}
+
+/* Native select/option dropdown dark theme */
+select,
+select option {
+  background-color: #0c1220;
+  color: #e2e8f0;
 }
 
 /* Ambient glow background */

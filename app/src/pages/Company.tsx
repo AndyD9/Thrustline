@@ -309,7 +309,7 @@ export default function Company() {
                 <select
                   value={campaignRoute}
                   onChange={(e) => setCampaignRoute(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-sm text-white"
+                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[#0c1220] px-3 py-2 text-sm text-white [&>option]:bg-[#0c1220] [&>option]:text-white"
                 >
                   <option value="">Select a route...</option>
                   {flightRoutes.map((r) => (
