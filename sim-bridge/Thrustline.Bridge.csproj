@@ -33,6 +33,8 @@
     <Reference Include="Microsoft.FlightSimulator.SimConnect">
       <HintPath>$(MSFS_SDK)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll</HintPath>
       <Private>true</Private>
+      <!-- Mixed-mode (C++/CLI) assembly — must NOT be embedded in single-file bundle -->
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Reference>
   </ItemGroup>
 
