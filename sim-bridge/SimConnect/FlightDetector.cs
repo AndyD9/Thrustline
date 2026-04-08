@@ -34,6 +34,9 @@ public class FlightDetector
 
     public void Ingest(SimData data)
     {
+        // Note: menu/loading-screen data is already filtered upstream
+        // via SIM DISABLED — only active flight data reaches here.
+
         var desiredPhase = data.OnGround ? FlightPhase.OnGround : FlightPhase.InFlight;
         if (desiredPhase == _current)
         {

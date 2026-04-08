@@ -6,9 +6,8 @@
 //
 // Architecture :
 //   - Thread dédié avec message pump Win32 (requis par SimConnect)
-//   - Struct décoré [SimConnect] pour les SimVars
-//   - Subscription à 1 Hz via SimVarManager
-//   - Auto-reconnect géré par SimConnect.NET
+//   - Subscriptions individuelles par SimVar (pas de struct)
+//   - Auto-reconnect avec boucle de retry manuelle
 //   - Émet DataReceived à chaque snapshot, ConnectionChanged sur open/quit
 
 using System.Runtime.InteropServices;
@@ -33,41 +32,6 @@ public class NativeSimConnectClient : ISimClient
 
     public event EventHandler<SimData>? DataReceived;
     public event EventHandler<bool>? ConnectionChanged;
-
-    // Struct miroir des SimVars — décoré avec [SimConnect] pour SimConnect.NET
-    [StructLayout(LayoutKind.Sequential)]
-    private struct SimVarsStruct
-    {
-        [SimConnect("PLANE LATITUDE", "degrees")]
-        public double Latitude;
-
-        [SimConnect("PLANE LONGITUDE", "degrees")]
-        public double Longitude;
-
-        [SimConnect("PLANE ALTITUDE", "feet")]
-        public double AltitudeFt;
-
-        [SimConnect("GROUND VELOCITY", "knots")]
-        public double GroundSpeedKts;
-
-        [SimConnect("AIRSPEED INDICATED", "knots")]
-        public double IndicatedAirspeedKts;
-
-        [SimConnect("PLANE HEADING DEGREES TRUE", "degrees")]
-        public double HeadingDeg;
-
-        [SimConnect("VERTICAL SPEED", "feet per minute")]
-        public double VerticalSpeedFpm;
-
-        [SimConnect("FUEL TOTAL QUANTITY", "gallons")]
-        public double FuelTotalGal;
-
-        [SimConnect("SIM ON GROUND")]
-        public double OnGround; // 0 ou 1
-
-        [SimConnect("TITLE", SimConnectDataType.String256)]
-        public string AircraftTitle;
-    }
 
     public NativeSimConnectClient(ILogger<NativeSimConnectClient> log, SimBridgeOptions options)
     {
@@ -111,7 +75,8 @@ public class NativeSimConnectClient : ISimClient
         {
             SimConnectClient? client = null;
             IntPtr hWnd = IntPtr.Zero;
-            ISimVarSubscription? subscription = null;
+            var subs = new List<ISimVarSubscription>();
+            System.Threading.Timer? titleTimer = null;
 
             try
             {
@@ -139,7 +104,7 @@ public class NativeSimConnectClient : ISimClient
 
                 client.ErrorOccurred += (_, args) =>
                 {
-                    _log.LogWarning("SimConnect error: {Error}", args);
+                    _log.LogDebug("SimConnect error: {Error} ctx={Ctx}", args.Error, args.Context);
                 };
 
                 // Connexion (bloquant si MSFS pas lancé → exception)
@@ -150,28 +115,76 @@ public class NativeSimConnectClient : ISimClient
                 LastError = null;
                 _log.LogInformation("SimConnect connected to MSFS.");
 
-                // Subscription aux SimVars à 1 Hz
-                subscription = client.SimVars.Subscribe<SimVarsStruct>(
-                    SimConnectPeriod.Second,
-                    raw =>
-                    {
-                        var simData = new SimData
-                        {
-                            Latitude = raw.Latitude,
-                            Longitude = raw.Longitude,
-                            AltitudeFt = raw.AltitudeFt,
-                            GroundSpeedKts = raw.GroundSpeedKts,
-                            IndicatedAirspeedKts = raw.IndicatedAirspeedKts,
-                            HeadingDeg = raw.HeadingDeg,
-                            VerticalSpeedFpm = raw.VerticalSpeedFpm,
-                            FuelTotalGal = raw.FuelTotalGal,
-                            OnGround = raw.OnGround != 0,
-                            AircraftTitle = raw.AircraftTitle?.Trim('\0'),
-                        };
+                // ── Subscriptions individuelles par SimVar à 1 Hz ────────────
+                // On accumule les valeurs et émet un snapshot complet à chaque
+                // mise à jour de latitude (qui arrive en premier à chaque tick).
 
-                        Latest = simData;
-                        DataReceived?.Invoke(this, simData);
-                    });
+                double latitude = 0, longitude = 0, altitude = 0;
+                double groundSpeed = 0, ias = 0, heading = 0;
+                double vs = 0, fuel = 0, onGround = 0;
+                double flaps = 0, gear = 0, parkBrake = 0, spoilers = 0, groundTrack = 0;
+                double simDisabled = 1; // 1 = menus, 0 = in-flight
+                string? title = null;
+
+                void EmitSnapshot()
+                {
+                    var simData = new SimData
+                    {
+                        Latitude = latitude,
+                        Longitude = longitude,
+                        AltitudeFt = altitude,
+                        GroundSpeedKts = groundSpeed,
+                        IndicatedAirspeedKts = ias,
+                        HeadingDeg = heading,
+                        VerticalSpeedFpm = vs,
+                        FuelTotalGal = fuel,
+                        OnGround = onGround != 0,
+                        AircraftTitle = title,
+                        FlapsAnglePct = flaps,
+                        GearPosition = gear,
+                        ParkingBrake = parkBrake != 0,
+                        SpoilersPct = spoilers,
+                        GroundTrackDeg = groundTrack,
+                    };
+                    Latest = simData;
+                    DataReceived?.Invoke(this, simData);
+                }
+
+                // Numeric SimVars — each subscription updates its field and the
+                // last one (SIM ON GROUND) emits the full snapshot.
+                subs.Add(client.SimVars.Subscribe<double>("PLANE LATITUDE", "degrees", SimConnectPeriod.Second, v => latitude = v));
+                subs.Add(client.SimVars.Subscribe<double>("PLANE LONGITUDE", "degrees", SimConnectPeriod.Second, v => longitude = v));
+                subs.Add(client.SimVars.Subscribe<double>("PLANE ALTITUDE", "feet", SimConnectPeriod.Second, v => altitude = v));
+                subs.Add(client.SimVars.Subscribe<double>("GROUND VELOCITY", "knots", SimConnectPeriod.Second, v => groundSpeed = v));
+                subs.Add(client.SimVars.Subscribe<double>("AIRSPEED INDICATED", "knots", SimConnectPeriod.Second, v => ias = v));
+                subs.Add(client.SimVars.Subscribe<double>("PLANE HEADING DEGREES TRUE", "degrees", SimConnectPeriod.Second, v => heading = v));
+                subs.Add(client.SimVars.Subscribe<double>("VERTICAL SPEED", "feet per minute", SimConnectPeriod.Second, v => vs = v));
+                subs.Add(client.SimVars.Subscribe<double>("FUEL TOTAL QUANTITY", "gallons", SimConnectPeriod.Second, v => fuel = v));
+                subs.Add(client.SimVars.Subscribe<double>("SIM ON GROUND", "bool", SimConnectPeriod.Second, v => onGround = v));
+                subs.Add(client.SimVars.Subscribe<double>("FLAPS HANDLE PERCENT", "percent", SimConnectPeriod.Second, v => flaps = v));
+                subs.Add(client.SimVars.Subscribe<double>("GEAR TOTAL PCT EXTENDED", "percent", SimConnectPeriod.Second, v => gear = v));
+                subs.Add(client.SimVars.Subscribe<double>("BRAKE PARKING INDICATOR", "bool", SimConnectPeriod.Second, v => parkBrake = v));
+                subs.Add(client.SimVars.Subscribe<double>("SPOILERS HANDLE POSITION", "percent", SimConnectPeriod.Second, v => spoilers = v));
+                subs.Add(client.SimVars.Subscribe<double>("GPS GROUND TRUE TRACK", "degrees", SimConnectPeriod.Second, v => groundTrack = v));
+                subs.Add(client.SimVars.Subscribe<double>("SIM DISABLED", "bool", SimConnectPeriod.Second, v =>
+                {
+                    simDisabled = v;
+                    if (simDisabled == 0) EmitSnapshot(); // only emit when actually in a flight
+                }));
+
+                // Aircraft title — poll every 5 seconds (doesn't change often)
+                // Note: TITLE is a string SimVar that doesn't accept a unit parameter
+                // via Subscribe<string>, so we poll it with GetAsync instead.
+                titleTimer = new System.Threading.Timer(async _ =>
+                {
+                    try
+                    {
+                        title = (await client.SimVars.GetAsync<string>("TITLE", "string"))?.Trim('\0');
+                    }
+                    catch { /* ignore — title stays at last known value */ }
+                }, null, 0, 5000);
+
+                _log.LogInformation("Subscribed to {Count} SimVars.", subs.Count);
 
                 // Message pump : traite les messages Win32 de SimConnect
                 while (_cts is { IsCancellationRequested: false } && IsConnected)
@@ -210,7 +223,9 @@ public class NativeSimConnectClient : ISimClient
             }
             finally
             {
-                subscription?.Dispose();
+                titleTimer?.Dispose();
+                foreach (var sub in subs) sub.Dispose();
+                subs.Clear();
                 SetConnected(false);
 
                 if (client is not null)

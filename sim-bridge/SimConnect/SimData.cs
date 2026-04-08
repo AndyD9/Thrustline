@@ -17,4 +17,9 @@ public record SimData
     public double FuelTotalGal { get; init; }
     public bool OnGround { get; init; }
     public string? AircraftTitle { get; init; }
+    public double FlapsAnglePct { get; init; }
+    public double GearPosition { get; init; }     // 0 = up, 1 = down
+    public bool ParkingBrake { get; init; }
+    public double SpoilersPct { get; init; }
+    public double GroundTrackDeg { get; init; }
 }
