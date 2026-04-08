@@ -37,19 +37,23 @@ $PublishDir  = Join-Path $BridgeDir "publish"
 $PublishedExe = Join-Path $PublishDir "sim-bridge.exe"
 Copy-Item $PublishedExe $TargetFile -Force
 
-# Copie la DLL SimConnect managee (requise a cote de l'exe, non embarquable en single-file)
-$SimConnectManaged = Join-Path $PublishDir "Microsoft.FlightSimulator.SimConnect.dll"
-if (Test-Path $SimConnectManaged) {
-    Copy-Item $SimConnectManaged $TargetDir -Force
-    Write-Host "SimConnect managed DLL copied to binaries/" -ForegroundColor Yellow
-} else {
-    Write-Host "WARNING: SimConnect managed DLL not found in publish output - sidecar will run in idle mode" -ForegroundColor Yellow
-}
-
-# Copie la DLL SimConnect native (la managee en depend via P/Invoke)
+# Copie les DLLs SimConnect depuis le SDK (requises a cote de l'exe)
+# - Microsoft.FlightSimulator.SimConnect.dll (managee, wrapper .NET)
+# - SimConnect.dll (native C++, appelee via P/Invoke par la managee)
+# dotnet publish en single-file peut embarquer la managee dans l'exe,
+# donc on la copie directement depuis le SDK pour etre sur.
 $SdkPath = $env:MSFS_SDK
 if ($SdkPath) {
-    $SimConnectNative = Join-Path $SdkPath "SimConnect SDK\lib\SimConnect.dll"
+    $SimConnectManaged = Join-Path $SdkPath "SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll"
+    $SimConnectNative  = Join-Path $SdkPath "SimConnect SDK\lib\SimConnect.dll"
+
+    if (Test-Path $SimConnectManaged) {
+        Copy-Item $SimConnectManaged $TargetDir -Force
+        Write-Host "SimConnect managed DLL copied to binaries/" -ForegroundColor Yellow
+    } else {
+        Write-Host "WARNING: SimConnect managed DLL not found at $SimConnectManaged" -ForegroundColor Yellow
+    }
+
     if (Test-Path $SimConnectNative) {
         Copy-Item $SimConnectNative $TargetDir -Force
         Write-Host "SimConnect native DLL copied to binaries/" -ForegroundColor Yellow
@@ -57,7 +61,7 @@ if ($SdkPath) {
         Write-Host "WARNING: SimConnect native DLL not found at $SimConnectNative" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "WARNING: MSFS_SDK env var not set - SimConnect native DLL not copied" -ForegroundColor Yellow
+    Write-Host "WARNING: MSFS_SDK env var not set - SimConnect DLLs not copied, sidecar will run in idle mode" -ForegroundColor Yellow
 }
 
 $Size = [math]::Round((Get-Item $TargetFile).Length / 1MB, 1)
