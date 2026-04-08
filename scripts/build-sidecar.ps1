@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot   = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $BridgeDir  = Join-Path $RepoRoot "sim-bridge"
-$TargetDir  = Join-Path $RepoRoot "app" "src-tauri" "binaries"
+$TargetDir  = Join-Path (Join-Path (Join-Path $RepoRoot "app") "src-tauri") "binaries"
 $TargetFile = Join-Path $TargetDir "sim-bridge-x86_64-pc-windows-msvc.exe"
 
 Write-Host "=== Building sim-bridge (win-x64, self-contained, single-file) ===" -ForegroundColor Cyan
@@ -33,7 +33,7 @@ if (-not (Test-Path $TargetDir)) {
 }
 
 # Copie le binaire
-$PublishedExe = Join-Path $BridgeDir "publish" "sim-bridge.exe"
+$PublishedExe = Join-Path (Join-Path $BridgeDir "publish") "sim-bridge.exe"
 Copy-Item $PublishedExe $TargetFile -Force
 
 $Size = [math]::Round((Get-Item $TargetFile).Length / 1MB, 1)
