@@ -54,8 +54,8 @@ export async function maybeGenerateEvents(companyId: string, userId: string): Pr
   const events: Array<{
     user_id: string;
     company_id: string;
-    type: string;
-    scope: string;
+    type: GameEventType;
+    scope: GameEventScope;
     target_id: string | null;
     title: string;
     description: string;

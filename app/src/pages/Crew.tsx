@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Select } from "@/components/Select";
-import { Users, Plus, X, Shield, RefreshCw, Bed, Zap, UserPlus, Briefcase, Clock } from "lucide-react";
+import { Users, Plus, X, Shield, RefreshCw, Bed, Zap, UserPlus, Briefcase } from "lucide-react";
 import type { Aircraft, CrewMember, CrewRank, CrewStatus } from "@/lib/database.types";
 import { generateCandidates, type CrewCandidate } from "@/lib/crewGen";
 
@@ -329,34 +329,3 @@ function HireCrewForm({
   );
 }
 
-/* ---------- Reusable field ---------- */
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  required,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  required?: boolean;
-  type?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-slate-400">{label}</span>
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        required={required}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-brand-400/50"
-      />
-    </label>
-  );
-}

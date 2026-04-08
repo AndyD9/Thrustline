@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Select } from "@/components/Select";
 import { Plane, Plus, X, Play, Ban, Radio, Users, Mountain, AlertTriangle, ExternalLink, Download, Loader2, FileText, Megaphone, Tag } from "lucide-react";
-import type { Aircraft, Dispatch as DispatchT, DispatchStatus, MarketingCampaign, Route as RouteT } from "@/lib/database.types";
+import type { Aircraft, Dispatch as DispatchT, DispatchStatus, MarketingCampaign } from "@/lib/database.types";
 import AirportPicker from "@/components/AirportPicker";
 import FlightMap from "@/components/FlightMap";
 import { airportByIcao } from "@/data/airports";
@@ -347,7 +347,7 @@ function NewDispatchForm({
       .eq("dest_icao", destIcao)
       .maybeSingle()
       .then(({ data }) => setRoutePriceModifier(data?.price_modifier ?? 1.0))
-      .catch(() => setRoutePriceModifier(1.0));
+      .then(undefined, () => setRoutePriceModifier(1.0));
 
     // Active marketing campaigns affecting this route
     const routeKey = `${originIcao}-${destIcao}`;
@@ -365,7 +365,7 @@ function NewDispatchForm({
         const mult = matching.reduce((m, c) => m * c.demand_multiplier, 1.0);
         setCampaignMultiplier(mult);
       })
-      .catch(() => { setActiveCampaigns([]); setCampaignMultiplier(1.0); });
+      .then(undefined, () => { setActiveCampaigns([]); setCampaignMultiplier(1.0); });
   }, [originIcao, destIcao, companyId]);
 
   // Dynamic pax demand (with pricing & campaign effects)

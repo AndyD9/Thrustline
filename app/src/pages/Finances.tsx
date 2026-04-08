@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark, Users, Plane, Receipt, Plus, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { CrewMember } from "@/lib/database.types";
+import type { Company, CrewMember } from "@/lib/database.types";
 import {
   AreaChart,
   Area,
@@ -217,7 +217,7 @@ export default function Finances() {
                   borderRadius: "0.75rem",
                   fontSize: 12,
                 }}
-                formatter={(value: number) => [currency(value), "Balance"]}
+                formatter={(value) => [currency(Number(value)), "Balance"]}
               />
               <Area
                 type="monotone"

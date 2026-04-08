@@ -11,6 +11,10 @@
  *    supabase gen types typescript --local > src/lib/database.types.ts
  *
  * Miroir exact de supabase/migrations/20260405120000_init.sql.
+ *
+ * NOTE: On utilise `type` au lieu de `interface` pour que chaque Row satisfasse
+ * `Record<string, unknown>` (index signature implicite), requis par postgrest-js
+ * GenericTable à partir de v2.101+.
  */
 
 export type Json =
@@ -49,7 +53,7 @@ export type TransactionType =
   | "sale"
   | "loan_payment";
 
-export interface Company {
+export type Company = {
   id: string;
   user_id: string;
   name: string;
@@ -63,9 +67,9 @@ export interface Company {
   last_billing_at: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Aircraft {
+export type Aircraft = {
   id: string;
   user_id: string;
   company_id: string;
@@ -81,9 +85,9 @@ export interface Aircraft {
   purchase_price: number;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Route {
+export type Route = {
   id: string;
   user_id: string;
   company_id: string;
@@ -95,9 +99,9 @@ export interface Route {
   active: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Reputation {
+export type Reputation = {
   id: string;
   user_id: string;
   company_id: string;
@@ -107,9 +111,9 @@ export interface Reputation {
   flight_count: number;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface CrewMember {
+export type CrewMember = {
   id: string;
   user_id: string;
   company_id: string;
@@ -124,9 +128,9 @@ export interface CrewMember {
   status: CrewStatus;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Dispatch {
+export type Dispatch = {
   id: string;
   user_id: string;
   company_id: string;
@@ -144,9 +148,9 @@ export interface Dispatch {
   ofp_data: Json | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Flight {
+export type Flight = {
   id: string;
   user_id: string;
   company_id: string;
@@ -170,9 +174,9 @@ export interface Flight {
   completed_at: string;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface AcarsReport {
+export type AcarsReport = {
   id: string;
   user_id: string;
   company_id: string;
@@ -188,9 +192,9 @@ export interface AcarsReport {
   fuel_gal: number;
   message: string;
   created_at: string;
-}
+};
 
-export interface MarketingCampaign {
+export type MarketingCampaign = {
   id: string;
   user_id: string;
   company_id: string;
@@ -202,9 +206,9 @@ export interface MarketingCampaign {
   started_at: string;
   expires_at: string;
   created_at: string;
-}
+};
 
-export interface Partnership {
+export type Partnership = {
   id: string;
   user_id: string;
   company_id: string;
@@ -216,9 +220,9 @@ export interface Partnership {
   active: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Achievement {
+export type Achievement = {
   id: string;
   user_id: string;
   company_id: string;
@@ -229,9 +233,9 @@ export interface Achievement {
   unlocked_at: string;
   flight_id: string | null;
   created_at: string;
-}
+};
 
-export interface Loan {
+export type Loan = {
   id: string;
   user_id: string;
   company_id: string;
@@ -243,9 +247,9 @@ export interface Loan {
   interest_rate: number;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface GameEvent {
+export type GameEvent = {
   id: string;
   user_id: string;
   company_id: string;
@@ -259,9 +263,9 @@ export interface GameEvent {
   expires_at: string;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Transaction {
+export type Transaction = {
   id: string;
   user_id: string;
   company_id: string;
@@ -271,32 +275,38 @@ export interface Transaction {
   description: string;
   created_at: string;
   updated_at: string;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Shape attendue par @supabase/supabase-js createClient<Database>
+//
+// Le format doit respecter GenericSchema (postgrest-js v2.101+).
+// Chaque table nécessite Row, Insert, Update et Relationships.
 // ---------------------------------------------------------------------------
-type Row<T> = T;
-type Insert<T> = Partial<T> & { id?: string };
-type Update<T> = Partial<T>;
+type Table<T> = {
+  Row: T;
+  Insert: Partial<T> & { id?: string };
+  Update: Partial<T>;
+  Relationships: [];
+};
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
-      companies:    { Row: Row<Company>;     Insert: Insert<Company>;     Update: Update<Company> };
-      aircraft:     { Row: Row<Aircraft>;    Insert: Insert<Aircraft>;    Update: Update<Aircraft> };
-      routes:       { Row: Row<Route>;       Insert: Insert<Route>;       Update: Update<Route> };
-      reputations:  { Row: Row<Reputation>;  Insert: Insert<Reputation>;  Update: Update<Reputation> };
-      crew_members: { Row: Row<CrewMember>;  Insert: Insert<CrewMember>;  Update: Update<CrewMember> };
-      dispatches:   { Row: Row<Dispatch>;    Insert: Insert<Dispatch>;    Update: Update<Dispatch> };
-      flights:      { Row: Row<Flight>;      Insert: Insert<Flight>;      Update: Update<Flight> };
-      loans:        { Row: Row<Loan>;        Insert: Insert<Loan>;        Update: Update<Loan> };
-      game_events:  { Row: Row<GameEvent>;   Insert: Insert<GameEvent>;   Update: Update<GameEvent> };
-      transactions:  { Row: Row<Transaction>;  Insert: Insert<Transaction>;  Update: Update<Transaction> };
-      acars_reports:        { Row: Row<AcarsReport>;        Insert: Insert<AcarsReport>;        Update: Update<AcarsReport> };
-      achievements:         { Row: Row<Achievement>;         Insert: Insert<Achievement>;         Update: Update<Achievement> };
-      marketing_campaigns:  { Row: Row<MarketingCampaign>;   Insert: Insert<MarketingCampaign>;   Update: Update<MarketingCampaign> };
-      partnerships:         { Row: Row<Partnership>;          Insert: Insert<Partnership>;          Update: Update<Partnership> };
+      companies:            Table<Company>;
+      aircraft:             Table<Aircraft>;
+      routes:               Table<Route>;
+      reputations:          Table<Reputation>;
+      crew_members:         Table<CrewMember>;
+      dispatches:           Table<Dispatch>;
+      flights:              Table<Flight>;
+      loans:                Table<Loan>;
+      game_events:          Table<GameEvent>;
+      transactions:         Table<Transaction>;
+      acars_reports:        Table<AcarsReport>;
+      achievements:         Table<Achievement>;
+      marketing_campaigns:  Table<MarketingCampaign>;
+      partnerships:         Table<Partnership>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -309,5 +319,6 @@ export interface Database {
       game_event_scope: GameEventScope;
       transaction_type: TransactionType;
     };
+    CompositeTypes: Record<string, never>;
   };
-}
+};

@@ -2,7 +2,7 @@
 
 import { supabase } from "./supabase";
 import { maybeGenerateEvents } from "./gameEvents";
-import type { Company, CrewMember, Aircraft, Loan, Partnership, MarketingCampaign } from "./database.types";
+import type { Company, CrewMember, Aircraft, Loan, Partnership, MarketingCampaign, TransactionType } from "./database.types";
 
 const BILLING_INTERVAL_DAYS = 30;
 
@@ -74,7 +74,7 @@ export async function runBillingCycle(company: Company): Promise<BillingResult |
   const transactions: Array<{
     user_id: string;
     company_id: string;
-    type: string;
+    type: TransactionType;
     amount: number;
     description: string;
   }> = [];

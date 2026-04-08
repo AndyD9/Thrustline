@@ -25,7 +25,6 @@ import {
   ChevronDown,
   ChevronUp,
   Users,
-  Target,
 } from "lucide-react";
 
 export default function LiveFlight() {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSim } from "@/contexts/SimContext";
 import { useUnits } from "@/contexts/UnitsContext";
@@ -10,7 +10,6 @@ import {
   TrendingUp,
   TrendingDown,
   Fuel,
-  Clock,
   Route,
   Star,
 } from "lucide-react";
@@ -28,7 +27,7 @@ import {
 } from "recharts";
 import type { Flight, Transaction, Reputation, GameEvent } from "@/lib/database.types";
 import { fetchActiveEvents } from "@/lib/gameEvents";
-import { gradeToScore, gradeColors } from "@/lib/landingGrade";
+import { gradeToScore } from "@/lib/landingGrade";
 import FlightMap, { type RouteArc } from "@/components/FlightMap";
 import { airportByIcao } from "@/data/airports";
 
@@ -230,7 +229,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-3 gap-4">
             <MiniStat icon={Route} label="Distance" value={u.distance(lastLanding.distanceNm)} />
             <MiniStat icon={Plane} label="Landing VS" value={u.vs(Math.abs(lastLanding.landingVsFpm))} />
-            <MiniStat icon={Fuel} label="Fuel used" value={u.fuel(lastLanding.fuelStartGal - lastLanding.fuelEndGal)} />
+            <MiniStat icon={Fuel} label="Fuel used" value={u.fuel(lastLanding.fuelUsedGal)} />
           </div>
         </div>
       )}
@@ -333,12 +332,13 @@ export default function Dashboard() {
                     borderRadius: "0.75rem",
                     fontSize: 12,
                   }}
-                  formatter={(value: number, name: string) => {
+                  formatter={(value, name) => {
+                    const v = Number(value);
                     if (name === "score") {
                       const labels: Record<number, string> = { 10: "A+", 9: "A", 8: "B+", 7: "B", 6: "C+", 5: "C", 4: "D", 3: "D-", 2: "F+", 1: "F" };
-                      return [labels[value] ?? value, "Grade"];
+                      return [labels[v] ?? v, "Grade"];
                     }
-                    return [value + "%", "Pax"];
+                    return [v + "%", "Pax"];
                   }}
                 />
                 <Area type="monotone" dataKey="score" stroke="#34d399" strokeWidth={2} fill="url(#gradGrade)" />

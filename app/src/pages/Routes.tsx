@@ -5,8 +5,6 @@ import type { Flight, Reputation } from "@/lib/database.types";
 import FlightMap, { type RouteArc } from "@/components/FlightMap";
 import { airportByIcao } from "@/data/airports";
 import {
-  TrendingUp,
-  TrendingDown,
   Route,
   Star,
   Plane,

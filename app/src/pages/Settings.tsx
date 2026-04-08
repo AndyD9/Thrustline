@@ -135,7 +135,7 @@ export default function Settings() {
               icon={Wifi}
               label="SimConnect"
               value={health.simConnect}
-              highlight={health.simConnect === "connected"}
+              highlight={health.simConnect === "native"}
             />
             <StatusRow
               icon={Cloud}

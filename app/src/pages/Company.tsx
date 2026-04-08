@@ -7,7 +7,6 @@ import { CAMPAIGNS, campaignTotalCost } from "@/lib/campaigns";
 import type { Partnership, MarketingCampaign, Route, Flight } from "@/lib/database.types";
 import type { LucideIcon } from "lucide-react";
 import {
-  Building2,
   Star,
   DollarSign,
   Handshake,
@@ -24,9 +23,7 @@ import {
   Zap,
   Monitor,
   Clock,
-  CheckCircle2,
   XCircle,
-  AlertTriangle,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -43,7 +40,7 @@ export default function Company() {
   const [partnerships, setPartnerships] = useState<Partnership[]>([]);
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
 
   // Campaign launch modal state
   const [showCampaignModal, setShowCampaignModal] = useState(false);
@@ -58,12 +55,15 @@ export default function Company() {
     setLoading(true);
 
     // Query each table independently so a 404 on one doesn't break the others
+    const safe = <T,>(p: PromiseLike<{ data: T | null }>) =>
+      Promise.resolve(p).catch(() => ({ data: null as T | null }));
+
     const [pRes, cRes, rRes, fRes] = await Promise.all([
-      supabase.from("partnerships").select("*").eq("company_id", company.id).then(r => r).catch(() => ({ data: null })),
-      supabase.from("marketing_campaigns").select("*").eq("company_id", company.id)
-        .gt("expires_at", new Date().toISOString()).order("expires_at", { ascending: true }).then(r => r).catch(() => ({ data: null })),
-      supabase.from("routes").select("*").eq("company_id", company.id).eq("active", true).then(r => r).catch(() => ({ data: null })),
-      supabase.from("flights").select("departure_icao,arrival_icao").eq("company_id", company.id).then(r => r).catch(() => ({ data: null })),
+      safe(supabase.from("partnerships").select("*").eq("company_id", company.id)),
+      safe(supabase.from("marketing_campaigns").select("*").eq("company_id", company.id)
+        .gt("expires_at", new Date().toISOString()).order("expires_at", { ascending: true })),
+      safe(supabase.from("routes").select("*").eq("company_id", company.id).eq("active", true)),
+      safe(supabase.from("flights").select("departure_icao,arrival_icao").eq("company_id", company.id)),
     ]);
 
     setPartnerships((pRes.data as Partnership[]) ?? []);
