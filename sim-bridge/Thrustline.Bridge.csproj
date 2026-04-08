@@ -7,33 +7,14 @@
     <RootNamespace>Thrustline.Bridge</RootNamespace>
     <AssemblyName>sim-bridge</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <UserSecretsId>e289fb10-9806-4a52-bbef-50dcfb24d6f9</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Supabase .NET client : écritures depuis sim-bridge (flights, transactions, capital update).
-         Package moderne "Supabase" (rebrand de l'ancien "supabase-csharp" déprécié à la v0.16.2).
-         Expose les namespaces Supabase.Postgrest.Attributes / Supabase.Postgrest.Models utilisés
-         par nos DTOs dans Cloud/Models/. -->
+    <PackageReference Include="SimConnect.NET" Version="0.1.16-beta" />
     <PackageReference Include="Supabase" Version="1.1.1" />
-  </ItemGroup>
-
-  <!-- SimConnect SDK (Windows only). Le wrapper managé vit dans le MSFS SDK.
-       Sur Windows, set MSFS_SDK env var vers le dossier SDK installé.
-       Le flag HAS_SIMCONNECT est UNIQUEMENT défini quand la DLL est trouvée,
-       ce qui conditionne la compilation de NativeSimConnectClient.cs.
-       Si la DLL n'est pas là, le build réussit en idle mode. -->
-  <PropertyGroup Condition="'$(OS)' == 'Windows_NT' AND Exists('$(MSFS_SDK)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">
-    <DefineConstants>$(DefineConstants);HAS_SIMCONNECT</DefineConstants>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(OS)' == 'Windows_NT' AND Exists('$(MSFS_SDK)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">
-    <Reference Include="Microsoft.FlightSimulator.SimConnect">
-      <HintPath>$(MSFS_SDK)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll</HintPath>
-      <Private>true</Private>
-      <!-- Mixed-mode C++/CLI — cannot be embedded in single-file, must stay next to exe -->
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-    </Reference>
   </ItemGroup>
 
 </Project>

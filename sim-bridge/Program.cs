@@ -55,11 +55,10 @@ builder.Services.AddSingleton<LandingProcessor>();
 
 // --- SimConnect layer ---
 builder.Services.AddSingleton<FlightDetector>();
-#if HAS_SIMCONNECT
-builder.Services.AddSingleton<ISimClient, NativeSimConnectClient>();
-#else
-builder.Services.AddSingleton<ISimClient, IdleSimClient>();
-#endif
+if (OperatingSystem.IsWindows())
+    builder.Services.AddSingleton<ISimClient, NativeSimConnectClient>();
+else
+    builder.Services.AddSingleton<ISimClient, IdleSimClient>();
 builder.Services.AddHostedService<SimConnectWorker>();
 
 // --- SignalR (real-time sim stream towards the React front) ---
@@ -86,15 +85,13 @@ _ = app.Services.GetRequiredService<ISupabaseClientProvider>()
     .EnsureInitializedAsync(CancellationToken.None);
 
 // --- REST endpoints ---
-app.MapGet("/health", (ISupabaseClientProvider supabase, ISessionStore session) => Results.Ok(new
+app.MapGet("/health", (ISimClient sim, ISupabaseClientProvider supabase, ISessionStore session) => Results.Ok(new
 {
     status = "ok",
     version = "0.1.0",
-#if HAS_SIMCONNECT
-    simConnect = "native",
-#else
-    simConnect = "idle",
-#endif
+    simConnect = sim is NativeSimConnectClient ? "native" : "idle",
+    simConnected = sim.IsConnected,
+    simError = sim.LastError,
     supabaseConfigured = supabase.IsConfigured,
     hasSession = session.HasSession,
     time = DateTimeOffset.UtcNow
