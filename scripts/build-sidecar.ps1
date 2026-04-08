@@ -37,13 +37,27 @@ $PublishDir  = Join-Path $BridgeDir "publish"
 $PublishedExe = Join-Path $PublishDir "sim-bridge.exe"
 Copy-Item $PublishedExe $TargetFile -Force
 
-# Copie la DLL SimConnect native (requise à côté de l'exe, non embarquable en single-file)
-$SimConnectDll = Join-Path $PublishDir "Microsoft.FlightSimulator.SimConnect.dll"
-if (Test-Path $SimConnectDll) {
-    Copy-Item $SimConnectDll $TargetDir -Force
-    Write-Host "SimConnect DLL copied to binaries/" -ForegroundColor Yellow
+# Copie la DLL SimConnect managee (requise a cote de l'exe, non embarquable en single-file)
+$SimConnectManaged = Join-Path $PublishDir "Microsoft.FlightSimulator.SimConnect.dll"
+if (Test-Path $SimConnectManaged) {
+    Copy-Item $SimConnectManaged $TargetDir -Force
+    Write-Host "SimConnect managed DLL copied to binaries/" -ForegroundColor Yellow
 } else {
-    Write-Host "WARNING: SimConnect DLL not found in publish output - sidecar will run in mock mode" -ForegroundColor Yellow
+    Write-Host "WARNING: SimConnect managed DLL not found in publish output - sidecar will run in idle mode" -ForegroundColor Yellow
+}
+
+# Copie la DLL SimConnect native (la managee en depend via P/Invoke)
+$SdkPath = $env:MSFS_SDK
+if ($SdkPath) {
+    $SimConnectNative = Join-Path $SdkPath "SimConnect SDK\lib\SimConnect.dll"
+    if (Test-Path $SimConnectNative) {
+        Copy-Item $SimConnectNative $TargetDir -Force
+        Write-Host "SimConnect native DLL copied to binaries/" -ForegroundColor Yellow
+    } else {
+        Write-Host "WARNING: SimConnect native DLL not found at $SimConnectNative" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "WARNING: MSFS_SDK env var not set - SimConnect native DLL not copied" -ForegroundColor Yellow
 }
 
 $Size = [math]::Round((Get-Item $TargetFile).Length / 1MB, 1)
