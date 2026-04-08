@@ -7,6 +7,8 @@
     <RootNamespace>Thrustline.Bridge</RootNamespace>
     <AssemblyName>sim-bridge</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- SimConnect SDK is x64-only; force platform to avoid BadImageFormatException -->
+    <PlatformTarget>x64</PlatformTarget>
     <UserSecretsId>e289fb10-9806-4a52-bbef-50dcfb24d6f9</UserSecretsId>
   </PropertyGroup>
 
