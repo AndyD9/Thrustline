@@ -7,6 +7,7 @@ namespace Thrustline.Bridge.SimConnect;
 public record SimData
 {
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    public bool IsSimActive { get; init; } = true;
     public double Latitude { get; init; }
     public double Longitude { get; init; }
     public double AltitudeFt { get; init; }

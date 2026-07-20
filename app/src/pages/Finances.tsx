@@ -20,6 +20,7 @@ const currency = (n: number) =>
 
 const typeLabels: Record<TransactionType, string> = {
   revenue: "Revenue",
+  loan_received: "Loan received",
   fuel: "Fuel",
   landing_fee: "Landing fee",
   lease: "Lease",
@@ -32,6 +33,7 @@ const typeLabels: Record<TransactionType, string> = {
 
 const typeColors: Record<TransactionType, string> = {
   revenue: "text-emerald-400",
+  loan_received: "text-brand-300",
   fuel: "text-red-400",
   landing_fee: "text-red-400",
   lease: "text-red-400",
@@ -43,7 +45,7 @@ const typeColors: Record<TransactionType, string> = {
 };
 
 export default function Finances() {
-  const { company } = useCompany();
+  const { company, refetch: refetchCompany } = useCompany();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [crewCount, setCrewCount] = useState(0);
@@ -84,19 +86,19 @@ export default function Finances() {
         .select("salary_mo")
         .eq("company_id", company.id),
       supabase
-        .from("aircraft")
-        .select("lease_cost_mo")
+        .from("aircraft_leases")
+        .select("monthly_payment")
         .eq("company_id", company.id)
-        .eq("ownership", "leased"),
+        .in("status", ["active", "overdue"]),
     ]).then(([txRes, loanRes, crewRes, acRes]) => {
       setTransactions((txRes.data as Transaction[]) ?? []);
       setLoans((loanRes.data as Loan[]) ?? []);
       const crewData = (crewRes.data as Pick<CrewMember, "salary_mo">[]) ?? [];
       setCrewCount(crewData.length);
       setMonthlySalaries(crewData.reduce((s, c) => s + c.salary_mo, 0));
-      const acData = (acRes.data as { lease_cost_mo: number }[]) ?? [];
+      const acData = (acRes.data as { monthly_payment: number }[]) ?? [];
       setLeasedCount(acData.length);
-      setMonthlyLeases(acData.reduce((s, a) => s + a.lease_cost_mo, 0));
+      setMonthlyLeases(acData.reduce((s, a) => s + a.monthly_payment, 0));
       setLoading(false);
     });
   }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -105,6 +107,9 @@ export default function Finances() {
 
   const totals = transactions.reduce(
     (acc, tx) => {
+      const isLoanProceeds = tx.type === "loan_received"
+        || (tx.type === "sale" && tx.description.startsWith("Loan received"));
+      if (isLoanProceeds) return acc;
       if (tx.amount > 0) acc.income += tx.amount;
       else acc.expenses += Math.abs(tx.amount);
       return acc;
@@ -164,7 +169,7 @@ export default function Finances() {
               <div className="flex items-center gap-3 rounded-lg bg-white/[0.02] px-4 py-3">
                 <Plane className="h-4 w-4 text-slate-500" />
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Aircraft leases</div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Lease-to-own payments</div>
                   <div className="font-mono text-sm text-red-400">{currency(-monthlyLeases)}</div>
                   <div className="text-[10px] text-slate-600">{leasedCount} aircraft</div>
                 </div>
@@ -252,6 +257,7 @@ export default function Finances() {
             onDone={() => {
               setShowLoanForm(false);
               void refetchFinances();
+              void refetchCompany();
             }}
           />
         )}
@@ -313,7 +319,9 @@ export default function Finances() {
               >
                 <div className="flex items-center gap-4">
                   <span className="rounded-lg bg-white/[0.04] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-300">
-                    {typeLabels[tx.type]}
+                    {tx.type === "sale" && tx.description.startsWith("Loan received")
+                      ? typeLabels.loan_received
+                      : typeLabels[tx.type]}
                   </span>
                   <span className="text-sm text-slate-300">{tx.description}</span>
                 </div>
@@ -366,32 +374,15 @@ function NewLoanForm({
     setError(null);
     setSubmitting(true);
     try {
-      const { error: loanErr } = await supabase.from("loans").insert({
-        user_id: company.user_id,
-        company_id: company.id,
-        principal: p,
-        monthly_payment: monthlyPayment,
-        remaining_amount: totalRepaid,
-        total_months: m,
-        paid_months: 0,
-        interest_rate: interestRate,
+      const { error: loanErr } = await supabase.rpc("take_company_loan", {
+        p_company_id: company.id,
+        p_principal: p,
+        p_monthly_payment: monthlyPayment,
+        p_remaining_amount: totalRepaid,
+        p_total_months: m,
+        p_interest_rate: interestRate,
       });
       if (loanErr) throw loanErr;
-
-      // Credit capital
-      await supabase
-        .from("companies")
-        .update({ capital: company.capital + p })
-        .eq("id", company.id);
-
-      // Record transaction
-      await supabase.from("transactions").insert({
-        user_id: company.user_id,
-        company_id: company.id,
-        type: "sale",
-        amount: p,
-        description: `Loan received — $${p.toLocaleString()} over ${m} months at ${interestRate}% APR`,
-      });
 
       onDone();
     } catch (err) {

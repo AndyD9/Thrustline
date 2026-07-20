@@ -11,14 +11,16 @@ export interface SimBriefNavlogFix {
 }
 
 export interface SimBriefOFP {
-  origin: { icao: string; name: string };
-  destination: { icao: string; name: string };
+  origin: { icao: string; name: string; runway?: string; metar?: string; qnhHpa?: number };
+  destination: { icao: string; name: string; runway?: string; metar?: string; qnhHpa?: number };
   general: {
     route: string;
     flightNumber: string;
     cruiseAlt: number;
     distance: number;
     airDistance: number;
+    sid?: string;
+    star?: string;
   };
   fuel: {
     plan: number;
@@ -46,9 +48,31 @@ export interface SimBriefOFP {
   navlog: SimBriefNavlogFix[];
 }
 
+/** Extract QNH from either ICAO (Q1013) or FAA (A2992) METAR notation. */
+function qnhFromMetar(metar: string): number | undefined {
+  const qnh = metar.match(/\bQ(\d{4})\b/i);
+  if (qnh) return Number(qnh[1]);
+
+  const altimeter = metar.match(/\bA(\d{4})\b/i);
+  if (!altimeter) return undefined;
+  return Math.round((Number(altimeter[1]) / 100) * 33.8639);
+}
+
+function qnhFromAltimeter(value: unknown): number | undefined {
+  const altimeter = Number(value);
+  if (!Number.isFinite(altimeter) || altimeter <= 0) return undefined;
+  if (altimeter > 900) return Math.round(altimeter);
+  return Math.round(altimeter * 33.8639);
+}
+
+function firstText(...values: unknown[]): string {
+  const value = values.find((item) => typeof item === "string" && item.trim());
+  return typeof value === "string" ? value.trim() : "";
+}
+
 /** Fetch the latest OFP for a SimBrief username. Returns null if not found. */
 export async function fetchOFP(username: string): Promise<SimBriefOFP | null> {
-  const res = await fetch(`${API_URL}?username=${encodeURIComponent(username)}&json=1`);
+  const res = await fetch(`${API_URL}?username=${encodeURIComponent(username)}&json=v2`);
   if (!res.ok) return null;
 
   const data = await res.json();
@@ -68,14 +92,37 @@ export async function fetchOFP(username: string): Promise<SimBriefOFP | null> {
     }
   }
 
+  const originMetar = firstText(data.weather?.orig_metar, data.origin?.metar);
+  const destinationMetar = firstText(data.weather?.dest_metar, data.destination?.metar);
+  const takeoffConditions = data.tlr?.takeoff?.conditions;
+  const landingConditions = data.tlr?.landing?.conditions;
+  const originRunway = firstText(
+    data.origin?.plan_rwy,
+    data.origin?.runway,
+    takeoffConditions?.planned_runway,
+    data.api_params?.origrwy,
+  );
+  const destinationRunway = firstText(
+    data.destination?.plan_rwy,
+    data.destination?.runway,
+    landingConditions?.planned_runway,
+    data.api_params?.destrwy,
+  );
+
   return {
     origin: {
       icao: data.origin.icao_code ?? "",
       name: data.origin.name ?? "",
+      runway: originRunway,
+      metar: originMetar,
+      qnhHpa: qnhFromMetar(originMetar) ?? qnhFromAltimeter(takeoffConditions?.altimeter),
     },
     destination: {
       icao: data.destination.icao_code ?? "",
       name: data.destination.name ?? "",
+      runway: destinationRunway,
+      metar: destinationMetar,
+      qnhHpa: qnhFromMetar(destinationMetar) ?? qnhFromAltimeter(landingConditions?.altimeter),
     },
     general: {
       route: data.general?.route ?? "",
@@ -83,6 +130,8 @@ export async function fetchOFP(username: string): Promise<SimBriefOFP | null> {
       cruiseAlt: parseInt(data.general?.initial_altitude) || 0,
       distance: parseInt(data.general?.route_distance) || 0,
       airDistance: parseInt(data.general?.air_distance) || 0,
+      sid: data.general?.sid_ident ?? "",
+      star: data.general?.star_ident ?? "",
     },
     fuel: {
       plan: parseInt(data.fuel?.plan_ramp) || 0,
@@ -144,7 +193,7 @@ export async function fetchSimbriefAircraft(
     // the aircraft data from a dispatch generated with this aircraft.
     // Best approach: fetch the fleet list via the API.
     const res = await fetch(
-      `${API_URL}?username=${encodeURIComponent(username)}&json=1`,
+      `${API_URL}?username=${encodeURIComponent(username)}&json=v2`,
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -185,6 +234,13 @@ export function buildSimbriefUrl(opts: {
   flightNumber?: string;
   callsign?: string;
   pax?: number;
+  cargoKg?: number;
+  manualZfwKg?: number;
+  scheduledBlockHours?: number;
+  scheduledBlockMinutes?: number;
+  departureRunway?: string;
+  arrivalRunway?: string;
+  altitudeFt?: number;
   /** SimBrief saved aircraft internal ID — overrides type with exact aircraft profile */
   simbriefAircraftId?: string | null;
   registration?: string | null;
@@ -198,6 +254,14 @@ export function buildSimbriefUrl(opts: {
   if (opts.flightNumber) params.set("fltnum", opts.flightNumber);
   if (opts.callsign) params.set("callsign", opts.callsign);
   if (opts.pax && opts.pax > 0) params.set("pax", String(opts.pax));
+  params.set("units", "KGS");
+  if (opts.cargoKg !== undefined && opts.cargoKg >= 0) params.set("cargo", String(opts.cargoKg / 1000));
+  if (opts.manualZfwKg && opts.manualZfwKg > 0) params.set("manualzfw", String(opts.manualZfwKg / 1000));
+  if (opts.scheduledBlockHours !== undefined) params.set("steh", String(opts.scheduledBlockHours));
+  if (opts.scheduledBlockMinutes !== undefined) params.set("stem", String(opts.scheduledBlockMinutes));
+  if (opts.departureRunway) params.set("origrwy", opts.departureRunway);
+  if (opts.arrivalRunway) params.set("destrwy", opts.arrivalRunway);
+  if (opts.altitudeFt && opts.altitudeFt > 0) params.set("fl", String(opts.altitudeFt));
   if (opts.simbriefAircraftId) params.set("acid", opts.simbriefAircraftId);
   if (opts.registration) params.set("reg", opts.registration);
   return `https://dispatch.simbrief.com/options/custom?${params}`;

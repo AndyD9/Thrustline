@@ -34,6 +34,18 @@ public class FlightDetector
 
     public void Ingest(SimData data)
     {
+        if (!data.IsSimActive)
+        {
+            // Returning to a menu is not a landing. Clear stale flight state
+            // so the next loaded flight starts from a clean ground state.
+            _current = FlightPhase.OnGround;
+            _pendingSince = null;
+            _pendingTargetOnGround = null;
+            TakeoffSnapshot = null;
+            LandingSnapshot = null;
+            return;
+        }
+
         // Note: menu/loading-screen data is already filtered upstream
         // via SIM DISABLED — only active flight data reaches here.
 

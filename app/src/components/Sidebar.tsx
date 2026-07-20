@@ -55,15 +55,14 @@ export function Sidebar() {
   return (
     <aside className="m-3 flex w-60 flex-col rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-xl px-4 py-5">
       {/* Brand */}
-      <div className="mb-8 flex items-center gap-3 px-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/15 glow-brand-sm">
-          <Plane className="h-5 w-5 text-brand-300" />
-        </div>
-        <div>
-          <div className="text-sm font-bold tracking-wide text-white">Thrustline</div>
-          <div className="text-[10px] uppercase tracking-[0.15em] text-slate-500">
-            Virtual Airline
-          </div>
+      <div className="mb-8 px-2">
+        <img
+          src="/thrustline-logo.png"
+          alt="Thrustline"
+          className="h-10 w-auto max-w-full object-contain object-left"
+        />
+        <div className="mt-1 pl-[3.15rem] text-[10px] uppercase tracking-[0.15em] text-slate-500">
+          Virtual Airline
         </div>
       </div>
 

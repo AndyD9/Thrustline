@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Plane, Mail, Lock, ArrowRight } from "lucide-react";
+import { Mail, Lock, ArrowRight } from "lucide-react";
 
 type Mode = "signin" | "signup";
 
@@ -40,10 +40,11 @@ export default function Auth() {
 
           {/* Logo */}
           <div className="mb-10 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 glow-brand-sm">
-              <Plane className="h-7 w-7 text-brand-300" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Thrustline</h1>
+            <img
+              src="/thrustline-logo.png"
+              alt="Thrustline"
+              className="mx-auto mb-5 h-16 w-auto max-w-full object-contain"
+            />
             <p className="mt-1 text-sm text-slate-400">
               {mode === "signin" ? "Sign in to your airline" : "Create your airline account"}
             </p>

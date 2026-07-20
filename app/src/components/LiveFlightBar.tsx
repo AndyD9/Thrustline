@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useSim } from "@/contexts/SimContext";
 import { useUnits } from "@/contexts/UnitsContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -11,7 +12,7 @@ import type { LucideIcon } from "lucide-react";
  * Ne rend rien si pas de données.
  */
 export function LiveFlightBar() {
-  const { latest, simActive } = useSim();
+  const { latest, simActive, currentPhase } = useSim();
   const { fmt } = useUnits();
   const { company } = useCompany();
   const [flightInfo, setFlightInfo] = useState<{ flightNumber: string; origin: string; dest: string } | null>(null);
@@ -30,6 +31,31 @@ export function LiveFlightBar() {
         if (data) setFlightInfo({ flightNumber: data.flight_number, origin: data.origin_icao, dest: data.dest_icao });
       });
   }, [company?.id, simActive]);
+
+  useEffect(() => {
+    const phaseLabels: Record<string, string> = {
+      preflight: "Preflight",
+      taxi_out: "Taxiing for departure",
+      takeoff: "Taking off",
+      climb: "Climbing",
+      cruise: "Cruising",
+      descent: "Descending",
+      approach: "On approach",
+      landing: "Landed",
+      taxi_in: "Taxiing to the gate",
+    };
+
+    const details = simActive
+      ? phaseLabels[currentPhase ?? ""] ?? (latest?.onGround ? "On the ground" : "Flying")
+      : "Managing a virtual airline";
+    const state = simActive && flightInfo
+      ? `Flying ${flightInfo.origin} to ${flightInfo.dest}`
+      : "In Thrustline";
+
+    invoke("update_discord_presence", { details, state }).catch(() => {
+      // Browser-only Vite development has no Tauri command backend.
+    });
+  }, [currentPhase, flightInfo, latest?.onGround, simActive]);
 
   if (!latest || !simActive) return null;
 

@@ -202,7 +202,7 @@ export default function SchedulePage() {
         .update({ dispatch_id: data.id, status: "dispatched" })
         .eq("id", nextLeg.id);
       if (legError) throw legError;
-      navigate("/dispatch");
+      navigate(`/dispatch?edit=${data.id}`);
     } catch (err) {
       if (createdDispatchId) await supabase.from("dispatches").delete().eq("id", createdDispatchId);
       setError(err instanceof Error ? err.message : "Failed to create dispatch.");

@@ -26,9 +26,13 @@ export type Json =
   | Json[];
 
 export type AircraftOwnership = "leased" | "owned";
+export type AircraftLeaseStatus = "active" | "overdue" | "paid_off";
 export type DispatchStatus =
   | "pending"
   | "dispatched"
+  | "preflight"
+  | "boarding"
+  | "ready"
   | "flying"
   | "completed"
   | "cancelled";
@@ -46,6 +50,7 @@ export type GameEventType =
 export type GameEventScope = "global" | "route" | "aircraft";
 export type TransactionType =
   | "revenue"
+  | "loan_received"
   | "fuel"
   | "landing_fee"
   | "lease"
@@ -86,6 +91,61 @@ export type Aircraft = {
   ownership: AircraftOwnership;
   purchase_price: number;
   current_airport_icao: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UsedAircraftListing = {
+  id: string;
+  icao_type: string;
+  model_name: string;
+  registration: string;
+  seller_name: string;
+  manufacture_year: number;
+  total_hours: number;
+  cycles: number;
+  health_pct: number;
+  price: number;
+  location_icao: string;
+  status: "available" | "sold";
+  sold_to_company_id: string | null;
+  sold_at: string | null;
+  owner_user_id: string | null;
+  custom_catalog_id: string | null;
+  custom_variant: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NewAircraftCatalogItem = {
+  id: string;
+  icao_type: string;
+  manufacturer: string;
+  model_name: string;
+  price: number;
+  owner_user_id: string | null;
+  specs: Json;
+  created_at: string;
+};
+
+export type AircraftLease = {
+  id: string;
+  user_id: string;
+  company_id: string;
+  aircraft_id: string;
+  listing_id: string;
+  original_price: number;
+  down_payment: number;
+  financed_amount: number;
+  monthly_payment: number;
+  remaining_amount: number;
+  interest_rate: number;
+  total_months: number;
+  paid_months: number;
+  missed_payments: number;
+  status: AircraftLeaseStatus;
+  next_payment_at: string;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -344,6 +404,9 @@ export type Database = {
     Tables: {
       companies:            Table<Company>;
       aircraft:             Table<Aircraft>;
+      used_aircraft_listings: Table<UsedAircraftListing>;
+      new_aircraft_catalog: Table<NewAircraftCatalogItem>;
+      aircraft_leases:      Table<AircraftLease>;
       schedules:            Table<FlightSchedule>;
       schedule_rotations:   Table<ScheduleRotation>;
       schedule_legs:        Table<ScheduleLeg>;
@@ -361,9 +424,50 @@ export type Database = {
       partnerships:         Table<Partnership>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      buy_used_aircraft_listing: {
+        Args: { p_listing_id: string; p_company_id: string };
+        Returns: string;
+      };
+      buy_new_aircraft: {
+        Args: { p_catalog_id: string; p_company_id: string };
+        Returns: string;
+      };
+      lease_used_aircraft_listing: {
+        Args: { p_listing_id: string; p_company_id: string; p_term_months: number };
+        Returns: string;
+      };
+      buyout_aircraft_lease: {
+        Args: { p_lease_id: string; p_company_id: string };
+        Returns: undefined;
+      };
+      process_aircraft_lease_payments: {
+        Args: { p_company_id: string; p_months: number };
+        Returns: Json;
+      };
+      take_company_loan: {
+        Args: {
+          p_company_id: string;
+          p_principal: number;
+          p_monthly_payment: number;
+          p_remaining_amount: number;
+          p_total_months: number;
+          p_interest_rate: number;
+        };
+        Returns: string;
+      };
+      sync_custom_aircraft_profile: {
+        Args: { p_company_id: string; p_icao_type: string; p_model_name: string; p_manufacturer: string; p_mtow_kg: number; p_specs: Json };
+        Returns: string;
+      };
+      remove_custom_aircraft_profile: {
+        Args: { p_company_id: string; p_icao_type: string };
+        Returns: undefined;
+      };
+    };
     Enums: {
       aircraft_ownership: AircraftOwnership;
+      aircraft_lease_status: AircraftLeaseStatus;
       dispatch_status: DispatchStatus;
       crew_rank: CrewRank;
       crew_status: CrewStatus;

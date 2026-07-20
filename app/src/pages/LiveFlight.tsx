@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useSim } from "@/contexts/SimContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useUnits } from "@/contexts/UnitsContext";
 import { airportByIcao } from "@/data/airports";
 import FlightMap from "@/components/FlightMap";
@@ -33,6 +34,7 @@ export default function LiveFlight() {
   const dispatchId = params.get("dispatch");
 
   const { latest, simActive, lastLanding, acarsLog, currentPhase } = useSim();
+  const { company } = useCompany();
   const { fmt } = useUnits();
 
   const [dispatch, setDispatch] = useState<Dispatch | null>(null);
@@ -43,19 +45,20 @@ export default function LiveFlight() {
   const [acarsOpen, setAcarsOpen] = useState(true);
   const acarsEndRef = useRef<HTMLDivElement>(null);
 
-  // Track aircraft trail
-  const trailRef = useRef<[number, number][]>([]);
-  const [trail, setTrail] = useState<[number, number][]>([]);
-
-  // Load dispatch
+  // Load the requested dispatch. The sidebar intentionally links to the live
+  // page without query parameters, so fall back to the company's active flight.
   useEffect(() => {
-    if (!dispatchId) return;
-    supabase
-      .from("dispatches")
-      .select("*")
-      .eq("id", dispatchId)
-      .single()
-      .then(({ data }) => {
+    if (!dispatchId && !company?.id) return;
+    let cancelled = false;
+
+    const loadDispatch = async () => {
+      let query = supabase.from("dispatches").select("*");
+      query = dispatchId
+        ? query.eq("id", dispatchId)
+        : query.eq("company_id", company!.id).eq("status", "flying").order("updated_at", { ascending: false }).limit(1);
+
+      const { data } = await query.maybeSingle();
+      if (!cancelled) {
         if (!data) return;
         const d = data as Dispatch;
         setDispatch(d);
@@ -79,20 +82,31 @@ export default function LiveFlight() {
             }
           } catch { /* ignore parse errors */ }
         }
-      });
-  }, [dispatchId]);
+      }
+    };
 
-  // Accumulate aircraft trail
-  useEffect(() => {
-    if (!latest || latest.onGround) return;
-    const last = trailRef.current[trailRef.current.length - 1];
-    const pos: [number, number] = [latest.latitude, latest.longitude];
-    // Add every position update (~1Hz) for smooth trail
-    if (!last || Math.abs(last[0] - pos[0]) > 0.001 || Math.abs(last[1] - pos[1]) > 0.001) {
-      trailRef.current.push(pos);
-      setTrail([...trailRef.current]);
-    }
-  }, [latest]);
+    void loadDispatch();
+    return () => { cancelled = true; };
+  }, [company?.id, dispatchId]);
+
+  // Rebuild the flown trail from the flight-wide ACARS log so it survives a
+  // LiveFlight page remount, then connect it to the latest simulator position.
+  const trail = useMemo(() => {
+    const points: [number, number][] = [];
+
+    const append = (lat: number, lon: number) => {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      const last = points[points.length - 1];
+      if (!last || Math.abs(last[0] - lat) > 0.001 || Math.abs(last[1] - lon) > 0.001) {
+        points.push([lat, lon]);
+      }
+    };
+
+    for (const report of acarsLog) append(report.latitude, report.longitude);
+    if (latest && !latest.onGround) append(latest.latitude, latest.longitude);
+
+    return points;
+  }, [acarsLog, latest]);
 
   // Detect landing
   useEffect(() => {
@@ -121,6 +135,7 @@ export default function LiveFlight() {
         aircraft={aircraft}
         height="100%"
         interactive
+        zoomControlPosition="bottomright"
       />
 
       {/* Back button */}

@@ -58,6 +58,9 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | Dashboard | DONE | KPIs, flight network map (arcs courbes), charts, recent flights |
 | Flights | DONE | Table historique (route, distance, duration, fuel, revenue, net) |
 | Fleet | DONE | Cards avions, health bar, AircraftTypePicker, set active |
+| Marche d'occasion | DONE | Annonces partagees, filtres, etat/heures/prix/localisation, achat atomique avec debit et transaction |
+| Marche avions + credit-bail | DONE | Achat neuf, achat occasion, lease-to-own 12-48 mois, impayes, rachat anticipe et transfert automatique de propriete |
+| Profils SimBrief dans le marche | DONE | Chaque profil Settings genere une offre neuve et deux occasions privees, achetables ou finançables |
 | Dispatch | DONE | SimBrief-first workflow, OFP inline, route preview, callsign |
 | Crew | DONE | Table rank/status, aircraft assignment, hire form, random names |
 | Finances | DONE | Summary cards, cashflow chart (recharts), loans, transaction ledger |
@@ -70,6 +73,7 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 |---|---|---|
 | NativeSimConnectClient | DONE | `#if HAS_SIMCONNECT`, Win32 message pump, 10 SimVars, retry 5s |
 | Sidecar auto-spawn | DONE | `build-sidecar.ps1`, lib.rs child management, kill on close |
+| Discord Rich Presence | DONE | Phase ACARS et route du vol publiees dynamiquement par Tauri, reconnexion automatique |
 | Supabase Realtime | DONE | CompanyContext subscribe, capital updates live |
 | useRealtimeTable | DONE | Hook generique INSERT/UPDATE/DELETE |
 | waitForBridge | DONE | Retry helper startup |
@@ -89,6 +93,7 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | SimBrief integration | DONE | Generate (airline/fltnum/callsign/pax), Import OFP, inline resume, ofp_data persiste |
 | Unit system | DONE | Imperial/Metric toggle, UnitsContext, integre LiveFlightBar + Dashboard + LiveFlight |
 | Mock dispatch-driven | DONE | Idle par defaut, vol a la demande avec waypoints OFP, heading dynamique |
+| Import airframes SimBrief | DONE | Decodage local des liens partages, economie automatique, catalogue persistant dans Settings |
 
 ### Phase 6 — Flight Scheduling (MVP)
 
@@ -139,6 +144,7 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | Icone avion ne tourne pas | SVG Lucide pointe ~315°, pas 0° | Triangle simple nord=0° + rotate(heading) | `f8ee5c1` |
 | Supabase not configured | Pas de UserSecretsId dans csproj | Ajoute UserSecretsId + dotnet user-secrets | `0919e07` |
 | Mock vol auto en boucle | CDG→JFK 100s loop au demarrage | Dispatch-driven, idle par defaut | `0919e07` |
+| Vol affiche dans les menus MSFS | L'UI conservait le dernier snapshot actif quand `SIM DISABLED=1` | Etat actif propage et detecteur reinitialise | Non commite |
 
 ---
 

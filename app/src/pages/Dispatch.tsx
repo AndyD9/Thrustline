@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Select } from "@/components/Select";
-import { Plane, Plus, X, Play, Ban, Radio, Users, Mountain, AlertTriangle, ExternalLink, Download, Loader2, FileText, Megaphone, Tag } from "lucide-react";
+import { Plane, Plus, X, Play, Ban, Trash2, Radio, Users, Mountain, AlertTriangle, ExternalLink, Download, Loader2, FileText, Megaphone, Tag, ClipboardCheck, UserRoundCheck, CircleCheck, Undo2 } from "lucide-react";
 import type { Aircraft, Dispatch as DispatchT, DispatchStatus, MarketingCampaign } from "@/lib/database.types";
 import AirportPicker from "@/components/AirportPicker";
 import FlightMap from "@/components/FlightMap";
@@ -14,10 +14,14 @@ import { fetchOFP, buildSimbriefUrl, type SimBriefOFP } from "@/lib/simbrief";
 import { useUnits } from "@/contexts/UnitsContext";
 import { computePaxDemand } from "@/lib/paxDemand";
 import { open as shellOpen } from "@tauri-apps/plugin-shell";
+import OFPSummary from "@/components/OFPSummary";
 
 const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: string }> = {
   pending:    { bg: "bg-slate-500/10 border-slate-500/20",   text: "text-slate-300",   dot: "bg-slate-400" },
   dispatched: { bg: "bg-blue-500/10 border-blue-500/20",     text: "text-blue-300",    dot: "bg-blue-400" },
+  preflight:  { bg: "bg-cyan-500/10 border-cyan-500/20",     text: "text-cyan-300",    dot: "bg-cyan-400" },
+  boarding:   { bg: "bg-violet-500/10 border-violet-500/20", text: "text-violet-300",  dot: "bg-violet-400" },
+  ready:      { bg: "bg-amber-500/10 border-amber-500/20",   text: "text-amber-300",   dot: "bg-amber-400" },
   flying:     { bg: "bg-brand-500/10 border-brand-500/20",   text: "text-brand-300",   dot: "bg-brand-400" },
   completed:  { bg: "bg-emerald-500/10 border-emerald-500/20", text: "text-emerald-300", dot: "bg-emerald-400" },
   cancelled:  { bg: "bg-red-500/10 border-red-500/20",       text: "text-red-300",     dot: "bg-red-400" },
@@ -26,10 +30,12 @@ const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: stri
 export default function DispatchPage() {
   const { company } = useCompany();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [dispatches, setDispatches] = useState<DispatchT[]>([]);
   const [aircraft, setAircraft] = useState<Aircraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingDispatch, setEditingDispatch] = useState<DispatchT | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchDispatches = async () => {
@@ -60,6 +66,16 @@ export default function DispatchPage() {
     void fetchAircraft();
   }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || dispatches.length === 0) return;
+    const dispatch = dispatches.find((item) => item.id === editId && item.status === "pending");
+    if (dispatch) {
+      setEditingDispatch(dispatch);
+      setShowForm(true);
+    }
+  }, [dispatches, searchParams]);
+
   const updateStatus = async (id: string, status: DispatchStatus) => {
     setActionError(null);
     const { error: updateError } = await supabase.from("dispatches").update({ status }).eq("id", id);
@@ -71,7 +87,53 @@ export default function DispatchPage() {
       await supabase.from("schedule_legs").update({ status: "flying" }).eq("dispatch_id", id);
     } else if (status === "cancelled") {
       await supabase.from("schedule_legs").update({ status: "available", dispatch_id: null }).eq("dispatch_id", id);
+    } else if (["dispatched", "preflight", "boarding", "ready"].includes(status)) {
+      await supabase.from("schedule_legs").update({ status: "dispatched" }).eq("dispatch_id", id);
     }
+    await fetchDispatches();
+  };
+
+  const deleteDispatch = async (dispatch: DispatchT) => {
+    if (dispatch.status === "flying" || dispatch.status === "completed") return;
+    if (!window.confirm(`Delete dispatch ${dispatch.flight_number}?`)) return;
+
+    setActionError(null);
+
+    // A scheduled leg must become available again before its dispatch is removed.
+    const { data: linkedLegs, error: legReadError } = await supabase
+      .from("schedule_legs")
+      .select("id, status")
+      .eq("dispatch_id", dispatch.id);
+    if (legReadError) {
+      setActionError(legReadError.message);
+      return;
+    }
+
+    if (linkedLegs.length > 0) {
+      const { error: legUpdateError } = await supabase
+        .from("schedule_legs")
+        .update({ status: "available", dispatch_id: null })
+        .eq("dispatch_id", dispatch.id);
+      if (legUpdateError) {
+        setActionError(legUpdateError.message);
+        return;
+      }
+    }
+
+    const { error: deleteError } = await supabase
+      .from("dispatches")
+      .delete()
+      .eq("id", dispatch.id);
+    if (deleteError) {
+      // Best-effort rollback so a scheduled leg is not silently detached.
+      await Promise.all(linkedLegs.map((leg) => supabase
+        .from("schedule_legs")
+        .update({ status: leg.status, dispatch_id: dispatch.id })
+        .eq("id", leg.id)));
+      setActionError(deleteError.message);
+      return;
+    }
+
     await fetchDispatches();
   };
 
@@ -85,7 +147,11 @@ export default function DispatchPage() {
           <p className="text-sm text-slate-400">{dispatches.length} dispatches</p>
         </div>
         <button
-          onClick={() => setShowForm((s) => !s)}
+          onClick={() => {
+            setEditingDispatch(null);
+            setSearchParams({});
+            setShowForm((s) => !s);
+          }}
           className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 hover:shadow-[0_0_20px_oklch(0.58_0.18_195_/_0.25)]"
         >
           {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -107,8 +173,11 @@ export default function DispatchPage() {
           hubIcao={company.hub_icao}
           aircraft={aircraft}
           simbriefUsername={company.simbrief_username ?? ""}
+          initialDispatch={editingDispatch}
           onDone={() => {
             setShowForm(false);
+            setEditingDispatch(null);
+            setSearchParams({});
             void fetchDispatches();
           }}
         />
@@ -125,6 +194,7 @@ export default function DispatchPage() {
         <div className="space-y-3">
           {dispatches.map((d) => {
             const cfg = statusConfig[d.status];
+            const savedOfp = parseDispatchOFP(d.ofp_data);
             return (
               <div
                 key={d.id}
@@ -175,24 +245,94 @@ export default function DispatchPage() {
                   <div className="flex gap-2">
                     {d.status === "pending" && (
                       <>
+                        <ActionBtn label="Flight plan" icon={FileText} onClick={() => {
+                          setEditingDispatch(d);
+                          setShowForm(true);
+                          setSearchParams({ edit: d.id });
+                        }} />
                         <ActionBtn label="Dispatch" icon={Play} onClick={() => void updateStatus(d.id, "dispatched")} />
                         <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
                       </>
                     )}
                     {d.status === "dispatched" && (
-                      <ActionBtn label="Start flying" icon={Plane} variant="primary" onClick={async () => {
-                        await updateStatus(d.id, "flying");
-                        navigate(`/live-flight?dispatch=${d.id}`);
-                      }} />
+                      <>
+                        <ActionBtn label="Start pre-flight" icon={ClipboardCheck} variant="primary" onClick={() => void updateStatus(d.id, "preflight")} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                      </>
+                    )}
+                    {d.status === "preflight" && (
+                      <>
+                        <ActionBtn label="Start boarding" icon={Users} variant="primary" onClick={() => void updateStatus(d.id, "boarding")} />
+                        <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                      </>
+                    )}
+                    {d.status === "boarding" && (
+                      <>
+                        <ActionBtn label="Boarding complete" icon={UserRoundCheck} variant="primary" onClick={() => void updateStatus(d.id, "ready")} />
+                        <ActionBtn label="Back to pre-flight" icon={Undo2} onClick={() => void updateStatus(d.id, "preflight")} />
+                        <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                      </>
+                    )}
+                    {d.status === "ready" && (
+                      <>
+                        <ActionBtn label="Start flight" icon={CircleCheck} variant="primary" onClick={async () => {
+                          await updateStatus(d.id, "flying");
+                          navigate(`/live-flight?dispatch=${d.id}`);
+                        }} />
+                        <ActionBtn label="Back to boarding" icon={Undo2} onClick={() => void updateStatus(d.id, "boarding")} />
+                        <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                      </>
+                    )}
+                    {d.status === "cancelled" && (
+                      <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
                     )}
                     {d.status === "flying" && (
-                      <span className="flex items-center gap-2 text-xs text-brand-300">
-                        <Radio className="h-3.5 w-3.5 animate-pulse" />
-                        In flight
-                      </span>
+                      <>
+                        <span className="flex items-center gap-2 text-xs text-brand-300">
+                          <Radio className="h-3.5 w-3.5 animate-pulse" />
+                          In flight
+                        </span>
+                        <ActionBtn label="Not departed" icon={Undo2} variant="danger" onClick={() => {
+                          if (window.confirm("The aircraft has not taken off? Return this dispatch to pre-flight?")) {
+                            void updateStatus(d.id, "preflight");
+                          }
+                        }} />
+                      </>
                     )}
                   </div>
                 </div>
+
+                {savedOfp && ["dispatched", "preflight", "boarding", "ready", "flying"].includes(d.status) && (
+                  <OFPSummary
+                    ofp={savedOfp}
+                    defaultOpen={d.status === "preflight" || d.status === "flying"}
+                    onRefresh={company.simbrief_username ? async () => {
+                      setActionError(null);
+                      const refreshed = await fetchOFP(company.simbrief_username ?? "");
+                      if (!refreshed) {
+                        setActionError("Could not refresh the latest SimBrief OFP.");
+                        return;
+                      }
+                      if (refreshed.origin.icao !== d.origin_icao || refreshed.destination.icao !== d.dest_icao) {
+                        setActionError(`Latest SimBrief OFP is ${refreshed.origin.icao} → ${refreshed.destination.icao}, expected ${d.origin_icao} → ${d.dest_icao}.`);
+                        return;
+                      }
+                      const { error: refreshError } = await supabase
+                        .from("dispatches")
+                        .update({ ofp_data: JSON.stringify(refreshed) })
+                        .eq("id", d.id);
+                      if (refreshError) {
+                        setActionError(refreshError.message);
+                        return;
+                      }
+                      await fetchDispatches();
+                    } : undefined}
+                  />
+                )}
 
                 <div className="mt-2 text-[11px] text-slate-600">
                   Created {new Date(d.created_at).toLocaleString()}
@@ -204,6 +344,15 @@ export default function DispatchPage() {
       )}
     </div>
   );
+}
+
+function parseDispatchOFP(value: DispatchT["ofp_data"]): SimBriefOFP | null {
+  if (!value) return null;
+  try {
+    return (typeof value === "string" ? JSON.parse(value) : value) as SimBriefOFP;
+  } catch {
+    return null;
+  }
 }
 
 /* ---------- Action button ---------- */
@@ -252,6 +401,7 @@ function NewDispatchForm({
   hubIcao,
   aircraft,
   simbriefUsername,
+  initialDispatch,
   onDone,
 }: {
   companyId: string;
@@ -260,27 +410,44 @@ function NewDispatchForm({
   hubIcao: string;
   aircraft: Aircraft[];
   simbriefUsername: string;
+  initialDispatch: DispatchT | null;
   onDone: () => void;
 }) {
   const { fmt } = useUnits();
 
-  const [originIcao, setOriginIcao] = useState(aircraft[0]?.current_airport_icao ?? hubIcao);
-  const [destIcao, setDestIcao] = useState("");
+  const initialAircraft = aircraft.find((item) => item.id === initialDispatch?.aircraft_id) ?? aircraft[0];
+  const [originIcao, setOriginIcao] = useState(initialDispatch?.origin_icao ?? initialAircraft?.current_airport_icao ?? hubIcao);
+  const [destIcao, setDestIcao] = useState(initialDispatch?.dest_icao ?? "");
   const [repScore, setRepScore] = useState(50);
-  const [aircraftId, setAircraftId] = useState(aircraft[0]?.id ?? "");
-  const [icaoType, setIcaoType] = useState(aircraft[0]?.icao_type ?? "");
-  const [paxEco, setPaxEco] = useState("160");
-  const [paxBiz, setPaxBiz] = useState("12");
-  const [cargoKg, setCargoKg] = useState("0");
-  const [cruiseAlt, setCruiseAlt] = useState("35000");
-  const [estimFuelLbs, setEstimFuelLbs] = useState("0");
-  const [flightNumber, setFlightNumber] = useState(airlineCode + "001");
-  const [callsign, setCallsign] = useState(airlineCode + "001");
+  const [aircraftId, setAircraftId] = useState(initialAircraft?.id ?? "");
+  const [icaoType, setIcaoType] = useState(initialDispatch?.icao_type ?? initialAircraft?.icao_type ?? "");
+  const [paxEco, setPaxEco] = useState(String(initialDispatch?.pax_eco ?? 160));
+  const [paxBiz, setPaxBiz] = useState(String(initialDispatch?.pax_biz ?? 12));
+  const [cargoKg, setCargoKg] = useState(String(initialDispatch?.cargo_kg ?? 0));
+  const [cruiseAlt, setCruiseAlt] = useState(String(initialDispatch?.cruise_alt ?? 35000));
+  const [estimFuelLbs, setEstimFuelLbs] = useState(String(initialDispatch?.estim_fuel_lbs ?? 0));
+  const [flightNumber, setFlightNumber] = useState(initialDispatch?.flight_number ?? airlineCode + "001");
+  const [callsign, setCallsign] = useState(initialDispatch?.flight_number ?? airlineCode + "001");
+  const [departureRunway, setDepartureRunway] = useState("");
+  const [arrivalRunway, setArrivalRunway] = useState("");
+  const [blockHours, setBlockHours] = useState("0");
+  const [blockMinutes, setBlockMinutes] = useState("0");
+  const [blockTimeEdited, setBlockTimeEdited] = useState(false);
+  const [manualZfwKg, setManualZfwKg] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // SimBrief OFP
-  const [ofp, setOfp] = useState<SimBriefOFP | null>(null);
+  const [ofp, setOfp] = useState<SimBriefOFP | null>(() => {
+    if (!initialDispatch?.ofp_data) return null;
+    try {
+      return (typeof initialDispatch.ofp_data === "string"
+        ? JSON.parse(initialDispatch.ofp_data)
+        : initialDispatch.ofp_data) as SimBriefOFP;
+    } catch {
+      return null;
+    }
+  });
   const [importingOFP, setImportingOFP] = useState(false);
 
   // Company management integration
@@ -298,6 +465,13 @@ function NewDispatchForm({
       : null;
   const cruiseSpeed = acType?.cruiseSpeedKts ?? 450;
   const outOfRange = routeDistanceNm !== null && acType && routeDistanceNm > acType.rangeNm;
+
+  useEffect(() => {
+    if (blockTimeEdited || routeDistanceNm === null) return;
+    const totalMinutes = Math.ceil((routeDistanceNm / cruiseSpeed) * 60) + 30;
+    setBlockHours(String(Math.floor(totalMinutes / 60)));
+    setBlockMinutes(String(totalMinutes % 60));
+  }, [routeDistanceNm, cruiseSpeed, blockTimeEdited]);
 
   // Fetch reputation, route pricing, and active campaigns for this route
   useEffect(() => {
@@ -404,7 +578,7 @@ function NewDispatchForm({
       if (selectedAircraft && originIcao.trim().toUpperCase() !== currentAirport) {
         throw new Error(`${selectedAircraft.registration ?? selectedAircraft.name} is at ${currentAirport}. Reposition it before dispatching from ${originIcao}.`);
       }
-      const { error: insertError } = await supabase.from("dispatches").insert({
+      const values = {
         user_id: userId,
         company_id: companyId,
         aircraft_id: aircraftId || null,
@@ -419,8 +593,11 @@ function NewDispatchForm({
         cruise_alt: Number(cruiseAlt),
         status: "pending",
         ofp_data: ofp ? JSON.stringify(ofp) : null,
-      });
-      if (insertError) throw insertError;
+      } as const;
+      const { error: saveError } = initialDispatch
+        ? await supabase.from("dispatches").update(values).eq("id", initialDispatch.id)
+        : await supabase.from("dispatches").insert(values);
+      if (saveError) throw saveError;
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create dispatch");
@@ -431,7 +608,9 @@ function NewDispatchForm({
 
   return (
     <form onSubmit={onSubmit} className="rounded-xl border border-brand-500/20 bg-brand-500/[0.03] p-5 space-y-5 animate-slide-up">
-      <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">New dispatch</h2>
+      <h2 className="text-[10px] uppercase tracking-[0.15em] text-slate-500">
+        {initialDispatch ? `Flight preparation · ${initialDispatch.flight_number}` : "New dispatch"}
+      </h2>
 
       {/* ── Step 1: Route ────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
@@ -554,6 +733,25 @@ function NewDispatchForm({
         <Field label="Callsign" value={callsign} onChange={(v) => setCallsign(v.toUpperCase())} placeholder={`${airlineCode}001`} />
       </div>
 
+      <div className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.15em] text-slate-400">SimBrief options</div>
+          <div className="mt-1 text-[11px] text-slate-600">Pre-filled on SimBrief and still editable there. Leave runway and ZFW blank for AUTO.</div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-6">
+          <Field label="Block hours" value={blockHours} onChange={(value) => { setBlockHours(value); setBlockTimeEdited(true); }} type="number" />
+          <Field label="Block minutes" value={blockMinutes} onChange={(value) => { setBlockMinutes(value); setBlockTimeEdited(true); }} type="number" />
+          <Field label="Departure runway" value={departureRunway} onChange={(value) => setDepartureRunway(value.toUpperCase())} placeholder="AUTO" />
+          <Field label="Arrival runway" value={arrivalRunway} onChange={(value) => setArrivalRunway(value.toUpperCase())} placeholder="AUTO" />
+          <Field label="Altitude (ft)" value={cruiseAlt} onChange={setCruiseAlt} type="number" placeholder="AUTO" />
+          <Field label="Manual ZFW (kg)" value={manualZfwKg} onChange={setManualZfwKg} type="number" placeholder="AUTO" />
+        </div>
+        <div className="text-[10px] text-slate-600">
+          Passengers: {Number(paxEco) + Number(paxBiz)} · Freight: {Number(cargoKg).toLocaleString()} kg
+          {Number(manualZfwKg) > 0 && " · Manual ZFW overrides SimBrief's calculated payload/freight."}
+        </div>
+      </div>
+
       {/* ── Step 5: SimBrief ─────────────────────────── */}
       {simbriefUsername && (
         <div className="flex items-center gap-3">
@@ -573,6 +771,13 @@ function NewDispatchForm({
                 flightNumber: flightNumber.replace(airlineCode, ""),
                 callsign,
                 pax: Number(paxEco) + Number(paxBiz),
+                cargoKg: Number(cargoKg),
+                manualZfwKg: Number(manualZfwKg) || undefined,
+                scheduledBlockHours: Number(blockHours),
+                scheduledBlockMinutes: Number(blockMinutes),
+                departureRunway: departureRunway.trim() || undefined,
+                arrivalRunway: arrivalRunway.trim() || undefined,
+                altitudeFt: Number(cruiseAlt) || undefined,
                 simbriefAircraftId: selectedAc?.simbrief_aircraft_id,
                 registration: selectedAc?.registration,
               }));
@@ -672,7 +877,7 @@ function NewDispatchForm({
         disabled={submitting}
         className="rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:opacity-50"
       >
-        {submitting ? "Creating..." : "Create dispatch"}
+        {submitting ? "Saving..." : initialDispatch ? "Save flight plan" : "Create dispatch"}
       </button>
     </form>
   );

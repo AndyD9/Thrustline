@@ -5,6 +5,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Settings as SettingsIcon, Server, Wifi, WifiOff, Cloud, Monitor, ExternalLink, Save, Ruler, Trash2, AlertTriangle, X } from "lucide-react";
 import { useUnits } from "@/contexts/UnitsContext";
 import type { UnitSystem } from "@/lib/units";
+import { SimBriefAirframeImporter } from "@/components/SimBriefAirframeImporter";
 
 export default function Settings() {
   const { company, refetch: refetchCompany } = useCompany();
@@ -133,6 +134,8 @@ export default function Settings() {
           Your SimBrief username is used to fetch OFP data. Find it at simbrief.com under your account settings.
         </p>
       </section>
+
+      {company && <SimBriefAirframeImporter companyId={company.id} />}
 
       {/* sim-bridge status */}
       <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">

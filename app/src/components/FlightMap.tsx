@@ -6,6 +6,7 @@ import {
   Polyline,
   Tooltip,
   CircleMarker,
+  ZoomControl,
   useMap,
 } from "react-leaflet";
 import L from "leaflet";
@@ -31,6 +32,7 @@ interface FlightMapProps {
   aircraft?: { lat: number; lon: number; heading: number };
   height?: string;
   interactive?: boolean;
+  zoomControlPosition?: "topleft" | "topright" | "bottomleft" | "bottomright";
 }
 
 const DARK_TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
@@ -148,6 +150,7 @@ export default function FlightMap({
   aircraft,
   height = "300px",
   interactive = true,
+  zoomControlPosition = "topleft",
 }: FlightMapProps) {
   const apIcon = useMemo(() => airportIcon(), []);
 
@@ -192,13 +195,14 @@ export default function FlightMap({
         center={center}
         zoom={4}
         style={{ height: "100%", width: "100%", background: "#0a0f18" }}
-        zoomControl={interactive}
+        zoomControl={false}
         dragging={interactive}
         scrollWheelZoom={interactive}
         doubleClickZoom={interactive}
         touchZoom={interactive}
         attributionControl={false}
       >
+        {interactive && <ZoomControl position={zoomControlPosition} />}
         <TileLayer url={DARK_TILES} attribution={ATTRIBUTION} />
         <FitBounds origin={origin} destination={destination} aircraft={aircraft} routes={routes} />
 

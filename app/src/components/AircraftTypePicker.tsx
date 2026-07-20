@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { aircraftTypes, aircraftTypeByIcao, type AircraftType } from "@/data/aircraftTypes";
+import { loadImportedAirframes } from "@/lib/simbriefAirframes";
 
 interface AircraftTypePickerProps {
   value: string;
@@ -10,10 +11,10 @@ interface AircraftTypePickerProps {
 
 const MAX_RESULTS = 8;
 
-function search(query: string): AircraftType[] {
-  if (!query) return aircraftTypes.slice(0, MAX_RESULTS);
+function search(query: string, catalog: AircraftType[]): AircraftType[] {
+  if (!query) return catalog.slice(0, MAX_RESULTS);
   const q = query.toLowerCase();
-  return aircraftTypes
+  return catalog
     .filter(
       (t) =>
         t.icaoType.toLowerCase().includes(q) ||
@@ -33,6 +34,7 @@ export default function AircraftTypePicker({
   const [results, setResults] = useState<AircraftType[]>([]);
   const [open, setOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(0);
+  const [importedTypes, setImportedTypes] = useState(loadImportedAirframes);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -40,16 +42,20 @@ export default function AircraftTypePicker({
     setQuery(value);
   }, [value]);
 
-  const resolved = aircraftTypeByIcao[value];
+  const catalog = [
+    ...importedTypes,
+    ...aircraftTypes.filter((type) => !importedTypes.some((imported) => imported.icaoType === type.icaoType)),
+  ];
+  const resolved = importedTypes.find((type) => type.icaoType === value) ?? aircraftTypeByIcao[value];
 
   function handleInputChange(raw: string) {
     const v = raw.toUpperCase();
     setQuery(v);
-    const r = search(v);
+    const r = search(v, catalog);
     setResults(r);
     setOpen(r.length > 0);
     setHighlightIdx(0);
-    if (v !== value) onChange(v, aircraftTypeByIcao[v]);
+    if (v !== value) onChange(v, importedTypes.find((type) => type.icaoType === v) ?? aircraftTypeByIcao[v]);
   }
 
   function select(t: AircraftType) {
@@ -85,6 +91,16 @@ export default function AircraftTypePicker({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  useEffect(() => {
+    const reload = () => setImportedTypes(loadImportedAirframes());
+    window.addEventListener("thrustline-airframes-changed", reload);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("thrustline-airframes-changed", reload);
+      window.removeEventListener("storage", reload);
+    };
+  }, []);
+
   return (
     <div ref={wrapperRef} className="relative">
       {label && (
@@ -100,7 +116,7 @@ export default function AircraftTypePicker({
         required={required}
         onChange={(e) => handleInputChange(e.target.value)}
         onFocus={() => {
-          const r = search(query);
+          const r = search(query, catalog);
           setResults(r);
           setOpen(r.length > 0);
         }}

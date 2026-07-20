@@ -130,6 +130,7 @@ public class NativeSimConnectClient : ISimClient
                 {
                     var simData = new SimData
                     {
+                        IsSimActive = simDisabled == 0,
                         Latitude = latitude,
                         Longitude = longitude,
                         AltitudeFt = altitude,
@@ -169,7 +170,9 @@ public class NativeSimConnectClient : ISimClient
                 subs.Add(client.SimVars.Subscribe<double>("SIM DISABLED", "bool", SimConnectPeriod.Second, v =>
                 {
                     simDisabled = v;
-                    if (simDisabled == 0) EmitSnapshot(); // only emit when actually in a flight
+                    // Emit in both states so consumers are reset when MSFS
+                    // returns to a menu or loading screen.
+                    EmitSnapshot();
                 }));
 
                 // Aircraft title — poll every 5 seconds (doesn't change often)

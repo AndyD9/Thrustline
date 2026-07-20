@@ -123,7 +123,10 @@ public class SimConnectWorker : BackgroundService
     private void OnData(object? sender, SimData data)
     {
         _detector.Ingest(data);
-        _acars.Ingest(data);
+        if (data.IsSimActive)
+        {
+            _acars.Ingest(data);
+        }
         _ = _hub.Clients.All.SendAsync("simData", data);
     }
 

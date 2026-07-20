@@ -9,6 +9,7 @@ import { SIM_HUB_URL, waitForBridge } from "@/lib/simBridge";
 
 export interface SimData {
   timestamp: string;
+  isSimActive: boolean;
   latitude: number;
   longitude: number;
   altitudeFt: number;
@@ -109,15 +110,22 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
       connRef.current = conn;
 
       conn.on("simData", (data: SimData) => {
-        const hasRealData =
+        const hasRealData = data.isSimActive && (
           (!!data.aircraftTitle && data.aircraftTitle.trim().length > 0) ||
           data.latitude !== 0 ||
           data.longitude !== 0 ||
-          data.fuelTotalGal > 0;
+          data.fuelTotalGal > 0
+        );
         setState((s) => ({
           ...s,
           latest: hasRealData ? data : s.latest,
           simActive: hasRealData,
+          ...(!data.isSimActive && {
+            lastTakeoff: null,
+            lastLanding: null,
+            acarsLog: [],
+            currentPhase: null,
+          }),
         }));
       });
 

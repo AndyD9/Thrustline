@@ -78,7 +78,11 @@ export default function Dashboard() {
 
   // Compute stats
   const totalFlights = recentFlights.length;
-  const totalRevenue = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const totalRevenue = transactions
+    .filter(t => t.amount > 0
+      && t.type !== "loan_received"
+      && !(t.type === "sale" && t.description.startsWith("Loan received")))
+    .reduce((s, t) => s + t.amount, 0);
   const totalExpenses = transactions.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
 
   // Chart data — revenue per flight (last 10, reversed for chronological order)
