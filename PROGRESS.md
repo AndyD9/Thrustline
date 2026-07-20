@@ -7,7 +7,7 @@
 
 ## Branche : `rework`
 
-## Phase actuelle : Phase 5 — Game Mechanics (evenements, loans, salaires, reputation)
+## Phase actuelle : Phase 5 — Game Mechanics + MVP Flight Scheduling livre
 
 ---
 
@@ -89,6 +89,17 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | SimBrief integration | DONE | Generate (airline/fltnum/callsign/pax), Import OFP, inline resume, ofp_data persiste |
 | Unit system | DONE | Imperial/Metric toggle, UnitsContext, integre LiveFlightBar + Dashboard + LiveFlight |
 | Mock dispatch-driven | DONE | Idle par defaut, vol a la demande avec waypoints OFP, heading dynamique |
+
+### Phase 6 — Flight Scheduling (MVP)
+
+| Feature | Status | Details |
+|---|---|---|
+| Schedule generator | DONE | Vols/rotations/heures max/duree max, range avion, retour hub optionnel |
+| No teleport | DONE | Position avion persistante et validation DB au passage en flying |
+| Schedule UI | DONE | Preview carte + rotations, sauvegarde, annulation, prochain vol disponible |
+| Dispatch integration | DONE | Creation d'un seul dispatch depuis le prochain leg |
+| Landing progression | DONE | LandingProcessor complete le leg, deplace l'avion et debloque le suivant |
+| Supabase schema | DONE | schedules, schedule_rotations, schedule_legs, index et policies RLS |
 
 ---
 

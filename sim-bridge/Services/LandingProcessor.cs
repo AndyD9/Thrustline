@@ -246,6 +246,7 @@ public class LandingProcessor
                     .Set(a => a.HealthPct, maint.HealthPct)
                     .Set(a => a.Cycles, maint.Cycles)
                     .Set(a => a.TotalHours, maint.TotalHours)
+                    .Set(a => a.CurrentAirportIcao, dispatch.DestIcao)
                     .Update(cancellationToken: ct);
             }
 
@@ -279,14 +280,17 @@ public class LandingProcessor
                 .Set(d => d.Status, DispatchRow.StatusCompleted)
                 .Update(cancellationToken: ct);
 
-            // 12. Link ACARS reports to this flight
+            // 12. Advance a linked schedule and unlock only its next continuous leg.
+            await AdvanceScheduleAsync(dispatch.Id, ct);
+
+            // 13. Link ACARS reports to this flight
             await _acars.LinkReportsToFlight(dispatch.Id, insertedFlight.Id, ct);
             _acars.EndFlight();
 
-            // 13. Check achievements
+            // 14. Check achievements
             await _achievements.CheckAndAwardAsync(insertedFlight, company, userId.Value, ct);
 
-            // 14. Update global reputation
+            // 15. Update global reputation
             var globalRep = await _bonuses.RecalculateGlobalReputationAsync(company.Id, ct);
             await client.From<CompanyRow>()
                 .Where(c => c.Id == company.Id)
@@ -301,6 +305,61 @@ public class LandingProcessor
         catch (Exception ex)
         {
             _log.LogError(ex, "Failed to persist landing to Supabase.");
+        }
+    }
+
+    private async Task AdvanceScheduleAsync(Guid dispatchId, CancellationToken ct)
+    {
+        var client = _supabase.Client;
+        var linkedResponse = await client.From<ScheduleLegRow>()
+            .Where(leg => leg.DispatchId == dispatchId)
+            .Limit(1)
+            .Get(ct);
+        var completedLeg = linkedResponse.Models.FirstOrDefault();
+        if (completedLeg is null) return;
+
+        await client.From<ScheduleLegRow>()
+            .Where(leg => leg.Id == completedLeg.Id)
+            .Set(leg => leg.Status, "completed")
+            .Set(leg => leg.CompletedAt, DateTime.UtcNow)
+            .Update(cancellationToken: ct);
+
+        var allLegsResponse = await client.From<ScheduleLegRow>()
+            .Where(leg => leg.ScheduleId == completedLeg.ScheduleId)
+            .Get(ct);
+        var allLegs = allLegsResponse.Models.OrderBy(leg => leg.Sequence).ToList();
+        var nextLeg = allLegs.FirstOrDefault(leg => leg.Sequence > completedLeg.Sequence && leg.Status == "planned");
+
+        var currentRotationLegs = allLegs.Where(leg => leg.RotationId == completedLeg.RotationId).ToList();
+        if (currentRotationLegs.All(leg => leg.Id == completedLeg.Id || leg.Status == "completed"))
+        {
+            await client.From<ScheduleRotationRow>()
+                .Where(rotation => rotation.Id == completedLeg.RotationId)
+                .Set(rotation => rotation.Status, "completed")
+                .Update(cancellationToken: ct);
+        }
+
+        if (nextLeg is null)
+        {
+            await client.From<ScheduleRow>()
+                .Where(schedule => schedule.Id == completedLeg.ScheduleId)
+                .Set(schedule => schedule.Status, "completed")
+                .Set(schedule => schedule.CompletedAt, DateTime.UtcNow)
+                .Update(cancellationToken: ct);
+            return;
+        }
+
+        await client.From<ScheduleLegRow>()
+            .Where(leg => leg.Id == nextLeg.Id)
+            .Set(leg => leg.Status, "available")
+            .Update(cancellationToken: ct);
+
+        if (nextLeg.RotationId != completedLeg.RotationId)
+        {
+            await client.From<ScheduleRotationRow>()
+                .Where(rotation => rotation.Id == nextLeg.RotationId)
+                .Set(rotation => rotation.Status, "active")
+                .Update(cancellationToken: ct);
         }
     }
 

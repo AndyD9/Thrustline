@@ -17,6 +17,7 @@ import CompanyPage from "@/pages/Company";
 import RoutesPage from "@/pages/Routes";
 import Achievements from "@/pages/Achievements";
 import EFB from "@/pages/EFB";
+import SchedulePage from "@/pages/Schedule";
 
 function LoadingScreen({ label }: { label: string }) {
   return (
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/company" element={<CompanyPage />} />
         <Route path="/routes" element={<RoutesPage />} />
+        <Route path="/schedule" element={<SchedulePage />} />
         <Route path="/achievements" element={<Achievements />} />
         <Route path="/efb" element={<EFB />} />
         <Route path="/live-flight" element={<LiveFlight />} />

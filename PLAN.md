@@ -187,7 +187,22 @@ Ordre d'implementation : 5.3 → 5.2 → 5.4 → 5.1
 
 ---
 
-## Phase 6 — Polish & Deploy (A VENIR)
+## Phase 6 — Flight Scheduling (MVP TERMINE)
+
+- [x] Generateur de rotations continues par avion, sans teleport
+- [x] Contraintes : nombre de vols, nombre de rotations, heures totales, duree max par vol, range avion
+- [x] Retour optionnel au hub et avertissements quand les contraintes sont impossibles
+- [x] Position persistante de chaque avion (`current_airport_icao`)
+- [x] Tables `schedules`, `schedule_rotations`, `schedule_legs` avec RLS
+- [x] Page Schedule : configuration, preview carte/liste, sauvegarde et progression
+- [x] Un seul leg disponible a la fois, transforme en dispatch a la demande
+- [x] LandingProcessor : complete le leg, deplace l'avion et debloque le suivant
+- [x] Garde-fous DB : un planning actif et un vol flying par avion, validation de position
+- [ ] Horaires calendrier, temps au sol, overnight, contraintes crew et maintenance planifiee
+
+---
+
+## Phase 7 — Polish & Deploy (A VENIR)
 
 - [ ] CI/CD (GitHub Actions : build + test)
 - [ ] `supabase gen types typescript` — types auto-generes

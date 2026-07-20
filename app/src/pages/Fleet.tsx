@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Select } from "@/components/Select";
-import { Plane, Wrench, Clock, Hash, Plus, X, ChevronRight, Download, Loader2 } from "lucide-react";
+import { Plane, Wrench, Clock, Hash, Plus, X, ChevronRight, Download, Loader2, MapPin } from "lucide-react";
 import type { Aircraft } from "@/lib/database.types";
 import AircraftTypePicker from "@/components/AircraftTypePicker";
 import { fetchSimbriefAircraft } from "@/lib/simbrief";
@@ -178,6 +178,11 @@ export default function Fleet() {
                       {currency(ac.ownership === "leased" ? ac.lease_cost_mo : ac.purchase_price)}
                     </div>
                   </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-xs text-slate-500">
+                  <MapPin className="h-3.5 w-3.5 text-brand-400" />
+                  Current position
+                  <span className="ml-auto font-mono font-semibold text-slate-200">{ac.current_airport_icao ?? company.hub_icao}</span>
                 </div>
               </div>
             );

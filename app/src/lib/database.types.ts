@@ -34,6 +34,8 @@ export type DispatchStatus =
   | "cancelled";
 export type CrewRank = "captain" | "first_officer" | "cabin_crew";
 export type CrewStatus = "available" | "flying" | "resting";
+export type ScheduleStatus = "planned" | "active" | "completed" | "cancelled";
+export type ScheduleLegStatus = "planned" | "available" | "dispatched" | "flying" | "completed" | "cancelled";
 export type GameEventType =
   | "fuel_spike"
   | "fuel_drop"
@@ -83,8 +85,55 @@ export type Aircraft = {
   cycles: number;
   ownership: AircraftOwnership;
   purchase_price: number;
+  current_airport_icao: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type FlightSchedule = {
+  id: string;
+  user_id: string;
+  company_id: string;
+  aircraft_id: string;
+  name: string;
+  status: ScheduleStatus;
+  start_airport_icao: string;
+  hub_icao: string;
+  max_flight_minutes: number;
+  target_flights: number;
+  target_rotations: number;
+  return_to_hub: boolean;
+  generation_settings: Json;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+export type ScheduleRotation = {
+  id: string;
+  schedule_id: string;
+  sequence: number;
+  start_airport_icao: string;
+  end_airport_icao: string;
+  estimated_minutes: number;
+  status: ScheduleStatus;
+  created_at: string;
+};
+
+export type ScheduleLeg = {
+  id: string;
+  schedule_id: string;
+  rotation_id: string;
+  dispatch_id: string | null;
+  sequence: number;
+  origin_icao: string;
+  dest_icao: string;
+  distance_nm: number;
+  estimated_minutes: number;
+  flight_number: string;
+  status: ScheduleLegStatus;
+  created_at: string;
+  completed_at: string | null;
 };
 
 export type Route = {
@@ -295,6 +344,9 @@ export type Database = {
     Tables: {
       companies:            Table<Company>;
       aircraft:             Table<Aircraft>;
+      schedules:            Table<FlightSchedule>;
+      schedule_rotations:   Table<ScheduleRotation>;
+      schedule_legs:        Table<ScheduleLeg>;
       routes:               Table<Route>;
       reputations:          Table<Reputation>;
       crew_members:         Table<CrewMember>;

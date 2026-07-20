@@ -16,6 +16,7 @@ prisma/dev.db-journal
 # IDE
 .vscode/
 .idea/
+.vs/
 
 # OS
 .DS_Store
@@ -40,3 +41,6 @@ app/src-tauri/binaries/
 
 # Claude worktrees
 .claude/worktrees/
+
+# Supabase CLI local state
+supabase/.temp/

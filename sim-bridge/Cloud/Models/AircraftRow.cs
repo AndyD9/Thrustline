@@ -39,6 +39,9 @@ public class AircraftRow : BaseModel
     [Column("purchase_price")]
     public decimal PurchasePrice { get; set; }
 
+    [Column("current_airport_icao")]
+    public string? CurrentAirportIcao { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 

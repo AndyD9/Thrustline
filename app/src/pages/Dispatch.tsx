@@ -30,6 +30,7 @@ export default function DispatchPage() {
   const [aircraft, setAircraft] = useState<Aircraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchDispatches = async () => {
     if (!company) return;
@@ -60,7 +61,17 @@ export default function DispatchPage() {
   }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateStatus = async (id: string, status: DispatchStatus) => {
-    await supabase.from("dispatches").update({ status }).eq("id", id);
+    setActionError(null);
+    const { error: updateError } = await supabase.from("dispatches").update({ status }).eq("id", id);
+    if (updateError) {
+      setActionError(updateError.message);
+      return;
+    }
+    if (status === "flying") {
+      await supabase.from("schedule_legs").update({ status: "flying" }).eq("dispatch_id", id);
+    } else if (status === "cancelled") {
+      await supabase.from("schedule_legs").update({ status: "available", dispatch_id: null }).eq("dispatch_id", id);
+    }
     await fetchDispatches();
   };
 
@@ -82,11 +93,18 @@ export default function DispatchPage() {
         </button>
       </div>
 
+      {actionError && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">
+          {actionError}
+        </div>
+      )}
+
       {showForm && (
         <NewDispatchForm
           companyId={company.id}
           userId={company.user_id}
           airlineCode={company.airline_code}
+          hubIcao={company.hub_icao}
           aircraft={aircraft}
           simbriefUsername={company.simbrief_username ?? ""}
           onDone={() => {
@@ -231,6 +249,7 @@ function NewDispatchForm({
   companyId,
   userId,
   airlineCode,
+  hubIcao,
   aircraft,
   simbriefUsername,
   onDone,
@@ -238,13 +257,14 @@ function NewDispatchForm({
   companyId: string;
   userId: string;
   airlineCode: string;
+  hubIcao: string;
   aircraft: Aircraft[];
   simbriefUsername: string;
   onDone: () => void;
 }) {
   const { fmt } = useUnits();
 
-  const [originIcao, setOriginIcao] = useState("");
+  const [originIcao, setOriginIcao] = useState(aircraft[0]?.current_airport_icao ?? hubIcao);
   const [destIcao, setDestIcao] = useState("");
   const [repScore, setRepScore] = useState(50);
   const [aircraftId, setAircraftId] = useState(aircraft[0]?.id ?? "");
@@ -362,6 +382,7 @@ function NewDispatchForm({
     const ac = aircraft.find((a) => a.id === id);
     if (ac) {
       setIcaoType(ac.icao_type);
+      setOriginIcao(ac.current_airport_icao ?? hubIcao);
       const type = aircraftTypeByIcao[ac.icao_type];
       if (type) updatePaxFromDemand(type);
     }
@@ -378,6 +399,11 @@ function NewDispatchForm({
     setError(null);
     setSubmitting(true);
     try {
+      const selectedAircraft = aircraft.find((item) => item.id === aircraftId);
+      const currentAirport = selectedAircraft?.current_airport_icao ?? hubIcao;
+      if (selectedAircraft && originIcao.trim().toUpperCase() !== currentAirport) {
+        throw new Error(`${selectedAircraft.registration ?? selectedAircraft.name} is at ${currentAirport}. Reposition it before dispatching from ${originIcao}.`);
+      }
       const { error: insertError } = await supabase.from("dispatches").insert({
         user_id: userId,
         company_id: companyId,
