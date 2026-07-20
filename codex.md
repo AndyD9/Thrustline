@@ -25,7 +25,7 @@ The current roadmap focus is Phase 5 game mechanics, but the user's request alwa
 
 ## Setup and development
 
-Prerequisites are Node.js 20+, npm, .NET 8, Rust, the Tauri v2 platform prerequisites, and a Supabase project. Native SimConnect functionality requires Windows and an MSFS/SimConnect installation.
+Prerequisites are Node.js 24.18.0 LTS, npm, .NET 8, Rust, the Tauri v2 platform prerequisites, and a Supabase project. Native SimConnect functionality requires Windows and an MSFS/SimConnect installation.
 
 Frontend environment:
 
@@ -57,6 +57,7 @@ dotnet run
 
 # Production checks/builds
 Set-Location app
+npm test
 npm run build
 
 Set-Location sim-bridge

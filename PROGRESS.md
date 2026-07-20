@@ -145,9 +145,15 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 ## Commandes utiles
 
 ```bash
+# Prerequis frontend : Node.js 24.18.0 LTS
+
 # Frontend (dev)
 cd app && npm run dev                    # Vite dev server (port 1420)
 cd app && npm run tauri:dev              # Tauri + Vite (avec sidecar)
+
+# Frontend (validation)
+cd app && npm test
+cd app && npm run build
 
 # Sim-bridge (dev)
 cd sim-bridge && dotnet run              # Lance le service .NET (port 5055)
