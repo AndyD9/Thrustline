@@ -334,6 +334,7 @@ export default function DispatchPage() {
                     {d.status === "dispatched" && (
                       <>
                         <ActionBtn label="Start pre-flight" icon={ClipboardCheck} variant="primary" onClick={() => void updateStatus(d.id, "preflight")} />
+                        <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
                         <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => setDispatchToDelete(d)} />
                       </>
                     )}
