@@ -27,7 +27,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="relative flex h-screen w-screen items-center justify-center p-6 overflow-hidden">
+    <div className="relative flex h-full w-full items-center justify-center p-6 overflow-hidden">
       {/* Animated background glows */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-brand-500/[0.06] blur-[120px]" />

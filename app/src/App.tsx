@@ -5,6 +5,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Layout } from "@/components/Layout";
 import { Plane } from "lucide-react";
 import Auth from "@/pages/Auth";
+import { TitleBar } from "@/components/TitleBar";
 
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -23,7 +24,7 @@ const SchedulePage = lazy(() => import("@/pages/Schedule"));
 
 function LoadingScreen({ label }: { label: string }) {
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center gap-4">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-4">
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/15 glow-brand-sm">
         <Plane className="h-6 w-6 text-brand-300 animate-pulse" />
       </div>
@@ -40,7 +41,7 @@ function LoadingScreen({ label }: { label: string }) {
  *   4. no company          → /onboarding (no sidebar)
  *   5. company exists      → /dashboard, /flights, …  (Layout with sidebar)
  */
-export default function App() {
+function AppContent() {
   const { user, loading: authLoading } = useAuth();
   const { company, loading: companyLoading } = useCompany();
 
@@ -89,5 +90,16 @@ export default function App() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-0">
+      <TitleBar />
+      <div className="min-h-0 flex-1">
+        <AppContent />
+      </div>
+    </div>
   );
 }
