@@ -42,7 +42,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center p-6 overflow-hidden">
+    <div className="relative flex min-h-full items-center justify-center p-6 overflow-hidden">
       {/* Background glows */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-1/3 top-1/3 h-96 w-96 rounded-full bg-brand-500/[0.06] blur-[120px]" />
