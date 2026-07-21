@@ -45,7 +45,8 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | LandingProcessor | DONE | Pipeline complete : yield/cashflow/maintenance → Supabase writes |
 | Services metier | DONE | YieldService, CashflowService, MaintenanceService |
 | Cloud models (DTOs) | DONE | 6 models avec Supabase.Postgrest attributes |
-| SupabaseClientProvider | DONE | Singleton lazy-init, service_role key, UserSecretsId configure |
+| Backend privilegie | DONE | Edge Function authentifiee; aucune cle service_role dans le frontend ou le sidecar |
+| Deploiement securite Supabase | DONE | Migrations 20260721190000-20260721201000 appliquees et fonction complete-flight active sur le projet lie |
 | Schema Supabase | DONE | 10 tables, 7 enums, RLS policies, triggers |
 | Frontend Tauri + React | DONE | Tauri v2, React 18, TS, Vite, Tailwind v4 |
 | Auth + Onboarding | DONE | Supabase Auth, CompanyContext, AirportPicker hub |
@@ -81,6 +82,8 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | Supabase Realtime | DONE | CompanyContext subscribe, capital updates live |
 | useRealtimeTable | DONE | Hook generique INSERT/UPDATE/DELETE |
 | waitForBridge | DONE | Retry helper startup |
+| Durcissement desktop | DONE | JWT valide, appairage ephemere Tauri/bridge, CORS limite, CSP active et permissions shell reduites |
+| Chargement frontend | DONE | Pages metier, cartes, graphiques et base aeroports decoupes en chunks a la demande |
 | UI Polish v2 | DONE | Lucide icons, recharts, glassmorphism v2, animations |
 
 ### Phase 4 — Features majeures
@@ -162,7 +165,7 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | Polyline invisible sur carte | oklch() pas supporte par Leaflet | Couleur hex #00b4d8 | `081d200` |
 | Avion en diagonale sur carte | Lerp lineaire origin→dest sans waypoints | InterpolateRoute avec waypoints + Bearing | `8f72407` |
 | Icone avion ne tourne pas | SVG Lucide pointe ~315°, pas 0° | Triangle simple nord=0° + rotate(heading) | `f8ee5c1` |
-| Supabase not configured | Pas de UserSecretsId dans csproj | Ajoute UserSecretsId + dotnet user-secrets | `0919e07` |
+| Secret privilegie sur le client | Ancien sidecar configure avec service_role | Remplace par JWT utilisateur + Edge Function serveur | Securite distribution |
 | Mock vol auto en boucle | CDG→JFK 100s loop au demarrage | Dispatch-driven, idle par defaut | `0919e07` |
 | Vol affiche dans les menus MSFS | L'UI conservait le dernier snapshot actif quand `SIM DISABLED=1` | Etat actif propage et detecteur reinitialise | Non commite |
 
@@ -184,9 +187,8 @@ cd app && npm run build
 # Sim-bridge (dev)
 cd sim-bridge && dotnet run              # Lance le service .NET (port 5055)
 
-# Sim-bridge Supabase config
-cd sim-bridge && dotnet user-secrets set "Supabase:Url" "https://xxx.supabase.co"
-cd sim-bridge && dotnet user-secrets set "Supabase:ServiceRoleKey" "eyJ..."
+# Backend Supabase
+supabase functions deploy complete-flight --project-ref <project-ref>
 
 # Sidecar build (Windows)
 .\scripts\build-sidecar.ps1             # Publish + copie dans Tauri binaries

@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.SignalR;
-using Thrustline.Bridge.Cloud;
-using Thrustline.Bridge.Cloud.Models;
 using Thrustline.Bridge.Services;
 using Thrustline.Bridge.Session;
 
@@ -22,6 +20,7 @@ public class SimConnectWorker : BackgroundService
     private readonly PassengerExperienceService _passengers;
     private readonly IHubContext<SimHub> _hub;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ISessionStore _session;
     private readonly ILogger<SimConnectWorker> _log;
 
     public SimConnectWorker(
@@ -31,6 +30,7 @@ public class SimConnectWorker : BackgroundService
         PassengerExperienceService passengers,
         IHubContext<SimHub> hub,
         IServiceScopeFactory scopeFactory,
+        ISessionStore session,
         ILogger<SimConnectWorker> log)
     {
         _client = client;
@@ -39,6 +39,7 @@ public class SimConnectWorker : BackgroundService
         _passengers = passengers;
         _hub = hub;
         _scopeFactory = scopeFactory;
+        _session = session;
         _log = log;
     }
 
@@ -52,40 +53,12 @@ public class SimConnectWorker : BackgroundService
             _passengers.PrepareFlight(data.Timestamp);
             _ = _hub.Clients.All.SendAsync("takeoff", data, stoppingToken);
 
-            // Start ACARS tracking for the active dispatch
-            _ = Task.Run(async () =>
+            var context = _session.FlightContext;
+            if (context is not null)
             {
-                try
-                {
-                    using var scope = _scopeFactory.CreateScope();
-                    var supabase = scope.ServiceProvider.GetRequiredService<ISupabaseClientProvider>();
-                    var session = scope.ServiceProvider.GetRequiredService<ISessionStore>();
-                    if (!supabase.IsConfigured || session.CurrentUserId is null) return;
-
-                    await supabase.EnsureInitializedAsync(stoppingToken);
-                    var client = supabase.Client;
-
-                    var company = (await client.From<CompanyRow>()
-                        .Where(c => c.UserId == session.CurrentUserId.Value)
-                        .Single(stoppingToken));
-                    if (company is null) return;
-
-                    var dispatchResp = await client.From<DispatchRow>()
-                        .Where(d => d.CompanyId == company.Id)
-                        .Where(d => d.Status == DispatchRow.StatusFlying)
-                        .Limit(1)
-                        .Get(stoppingToken);
-                    var dispatch = dispatchResp.Models.FirstOrDefault();
-                    if (dispatch is null) return;
-
-                    _acars.StartFlight(dispatch.Id, company.Id);
-                    _passengers.StartFlight(dispatch.BoardedPaxEco, dispatch.BoardedPaxBiz, data.Timestamp);
-                }
-                catch (Exception ex)
-                {
-                    _log.LogError(ex, "Failed to start ACARS on takeoff");
-                }
-            }, stoppingToken);
+                _acars.StartFlight(context.DispatchId, context.CompanyId);
+                _passengers.StartFlight(context.EconomyPassengers, context.BusinessPassengers, data.Timestamp);
+            }
         };
 
         _detector.Landing += async (_, evt) =>

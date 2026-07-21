@@ -1,6 +1,7 @@
-using System.Reflection;
 using System.Runtime.InteropServices;
-using Thrustline.Bridge.Cloud;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Thrustline.Bridge.Services;
 using Thrustline.Bridge.Session;
 using Thrustline.Bridge.SimConnect;
@@ -15,6 +16,9 @@ if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 // --- Kestrel: bind to localhost:5055 (hardcoded so the sidecar works
 //     even without appsettings.json next to the single-file exe) ---
@@ -23,23 +27,11 @@ builder.WebHost.ConfigureKestrel(k =>
     k.ListenLocalhost(5055);
 });
 
-// --- Configuration ---
-// Charge user-secrets inconditionnellement (pas seulement en Development) afin que
-// `dotnet user-secrets set "Supabase:Url" ...` marche quelle que soit la façon dont
-// le projet est lancé. optional: true → no-op si l'utilisateur n'a pas fait `init`.
-builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true);
-
 var simBridgeConfig = builder.Configuration.GetSection("SimBridge").Get<SimBridgeOptions>() ?? new SimBridgeOptions();
 builder.Services.AddSingleton(simBridgeConfig);
 
-var supabaseConfig = builder.Configuration.GetSection("Supabase").Get<SupabaseOptions>() ?? new SupabaseOptions();
-builder.Services.AddSingleton(supabaseConfig);
-
 // --- Session (current logged-in user relayed from the React front) ---
 builder.Services.AddSingleton<ISessionStore, SessionStore>();
-
-// --- Supabase client ---
-builder.Services.AddSingleton<ISupabaseClientProvider, SupabaseClientProvider>();
 
 // --- Business services ---
 builder.Services.AddSingleton<YieldService>();
@@ -50,8 +42,6 @@ builder.Services.AddSingleton<FuelValidationService>();
 builder.Services.AddSingleton<PaxSatisfactionService>();
 builder.Services.AddSingleton<PassengerExperienceService>();
 builder.Services.AddSingleton<AcarsService>();
-builder.Services.AddSingleton<AchievementService>();
-builder.Services.AddSingleton<CompanyBonusService>();
 builder.Services.AddSingleton<LandingProcessor>();
 
 // --- SimConnect layer ---
@@ -64,13 +54,19 @@ builder.Services.AddHostedService<SimConnectWorker>();
 
 // --- SignalR (real-time sim stream towards the React front) ---
 builder.Services.AddSignalR();
+builder.Services.AddHttpClient();
 
 // --- CORS: allow the Tauri webview and localhost React dev server ---
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
+        policy.WithOrigins(
+                  "http://tauri.localhost",
+                  "https://tauri.localhost",
+                  "tauri://localhost",
+                  "http://localhost:1420",
+                  "http://127.0.0.1:1420")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -81,31 +77,83 @@ var app = builder.Build();
 
 app.UseCors();
 
-// --- Pre-init Supabase if configured (fire-and-forget, errors are logged inside) ---
-_ = app.Services.GetRequiredService<ISupabaseClientProvider>()
-    .EnsureInitializedAsync(CancellationToken.None);
+var bridgeToken = Environment.GetEnvironmentVariable("THRUSTLINE_BRIDGE_TOKEN");
+if (string.IsNullOrWhiteSpace(bridgeToken) && app.Environment.IsDevelopment())
+    bridgeToken = "dev-only-bridge-token";
+if (string.IsNullOrWhiteSpace(bridgeToken))
+    throw new InvalidOperationException("THRUSTLINE_BRIDGE_TOKEN is required outside development.");
+var expectedBridgeToken = Encoding.UTF8.GetBytes(bridgeToken);
+
+app.Use(async (context, next) =>
+{
+    if (HttpMethods.IsOptions(context.Request.Method)) { await next(); return; }
+    var supplied = context.Request.Headers["X-Thrustline-Bridge-Token"].FirstOrDefault()
+        ?? context.Request.Query["bridge_token"].FirstOrDefault();
+    var suppliedBytes = Encoding.UTF8.GetBytes(supplied ?? "");
+    if (suppliedBytes.Length != expectedBridgeToken.Length ||
+        !CryptographicOperations.FixedTimeEquals(suppliedBytes, expectedBridgeToken))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return;
+    }
+    await next();
+});
 
 // --- REST endpoints ---
-app.MapGet("/health", (ISimClient sim, ISupabaseClientProvider supabase, ISessionStore session) => Results.Ok(new
+app.MapGet("/health", (ISimClient sim, ISessionStore session) => Results.Ok(new
 {
     status = "ok",
     version = "0.1.0",
     simConnect = sim is NativeSimConnectClient ? "native" : "idle",
     simConnected = sim.IsConnected,
     simError = sim.LastError,
-    supabaseConfigured = supabase.IsConfigured,
+    backendConfigured = session.HasSession,
     hasSession = session.HasSession,
     time = DateTimeOffset.UtcNow
 }));
 
 // --- Session sync from React ---
-app.MapPost("/session", (SessionPayload payload, ISessionStore session) =>
+app.MapPost("/session", async (
+    SessionPayload payload,
+    ISessionStore session,
+    IHttpClientFactory httpClientFactory,
+    CancellationToken ct) =>
 {
-    if (payload.UserId == Guid.Empty)
-        return Results.BadRequest(new { error = "userId is required" });
+    if (string.IsNullOrWhiteSpace(payload.AccessToken))
+        return Results.BadRequest(new { error = "accessToken is required" });
 
-    session.SetUser(payload.UserId);
-    return Results.Ok(new { userId = payload.UserId });
+    if (!Uri.TryCreate(payload.SupabaseUrl, UriKind.Absolute, out var supabaseUrl) ||
+        (supabaseUrl.Scheme != Uri.UriSchemeHttps && !supabaseUrl.IsLoopback) ||
+        (!supabaseUrl.IsLoopback && !supabaseUrl.Host.EndsWith(".supabase.co", StringComparison.OrdinalIgnoreCase)))
+        return Results.BadRequest(new { error = "Invalid Supabase URL" });
+    if (string.IsNullOrWhiteSpace(payload.AnonKey))
+        return Results.BadRequest(new { error = "anonKey is required" });
+
+    try
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            new Uri(supabaseUrl, "/auth/v1/user"));
+        request.Headers.Authorization = new("Bearer", payload.AccessToken);
+        request.Headers.Add("apikey", payload.AnonKey);
+
+        using var response = await httpClientFactory.CreateClient().SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+            return Results.Unauthorized();
+
+        await using var body = await response.Content.ReadAsStreamAsync(ct);
+        using var user = await JsonDocument.ParseAsync(body, cancellationToken: ct);
+        if (!user.RootElement.TryGetProperty("id", out var idElement) ||
+            !Guid.TryParse(idElement.GetString(), out var authenticatedUserId))
+            return Results.Unauthorized();
+
+        session.Set(new AuthenticatedSession(authenticatedUserId, payload.AccessToken, supabaseUrl));
+        return Results.Ok(new { userId = authenticatedUserId });
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Problem("Supabase authentication is temporarily unavailable.", statusCode: 503);
+    }
 });
 
 app.MapDelete("/session", (ISessionStore session) =>
@@ -114,35 +162,52 @@ app.MapDelete("/session", (ISessionStore session) =>
     return Results.NoContent();
 });
 
+app.MapPost("/flight/context", (FlightContextPayload payload, ISessionStore session) =>
+{
+    if (!session.HasSession) return Results.Unauthorized();
+    if (payload.DispatchId == Guid.Empty || payload.CompanyId == Guid.Empty ||
+        payload.EconomyPassengers < 0 || payload.BusinessPassengers < 0 ||
+        payload.EconomyPassengers + payload.BusinessPassengers > 1000)
+        return Results.BadRequest(new { error = "Invalid flight context" });
+    session.SetFlightContext(new ActiveFlightContext(
+        payload.DispatchId, payload.CompanyId, payload.EconomyPassengers, payload.BusinessPassengers));
+    return Results.NoContent();
+});
+
 // --- Weather proxy (avoids CORS issues with aviationweather.gov) ---
 var httpClient = new HttpClient();
 httpClient.DefaultRequestHeaders.Add("User-Agent", "Thrustline/1.0");
+httpClient.Timeout = TimeSpan.FromSeconds(10);
 
 app.MapGet("/weather/metar/{icao}", async (string icao) =>
 {
+    icao = icao.Trim().ToUpperInvariant();
+    if (icao.Length != 4 || !icao.All(char.IsAsciiLetter)) return Results.BadRequest(new { error = "Invalid ICAO" });
     try
     {
         var url = $"https://aviationweather.gov/api/data/metar?ids={icao}&format=raw&taf=false";
         var text = (await httpClient.GetStringAsync(url)).Trim();
         return string.IsNullOrEmpty(text) ? Results.NotFound() : Results.Ok(new { raw = text });
     }
-    catch (Exception ex)
+    catch (Exception)
     {
-        return Results.Problem($"Weather fetch failed: {ex.Message}");
+        return Results.Problem("Weather service unavailable.", statusCode: 502);
     }
 });
 
 app.MapGet("/weather/taf/{icao}", async (string icao) =>
 {
+    icao = icao.Trim().ToUpperInvariant();
+    if (icao.Length != 4 || !icao.All(char.IsAsciiLetter)) return Results.BadRequest(new { error = "Invalid ICAO" });
     try
     {
         var url = $"https://aviationweather.gov/api/data/taf?ids={icao}&format=raw";
         var text = (await httpClient.GetStringAsync(url)).Trim();
         return string.IsNullOrEmpty(text) ? Results.NotFound() : Results.Ok(new { raw = text });
     }
-    catch (Exception ex)
+    catch (Exception)
     {
-        return Results.Problem($"Weather fetch failed: {ex.Message}");
+        return Results.Problem("Weather service unavailable.", statusCode: 502);
     }
 });
 
@@ -157,18 +222,5 @@ public class SimBridgeOptions
     public int GroundDebounceSeconds { get; set; } = 5;
 }
 
-public class SupabaseOptions
-{
-    /// <summary>URL du projet Supabase, ex: https://xxx.supabase.co</summary>
-    public string Url { get; set; } = "";
-
-    /// <summary>
-    /// Service role key — UNIQUEMENT côté sim-bridge (backend), jamais exposée au front.
-    /// Permet d'écrire les flights/transactions en contournant RLS lors des landings.
-    /// À mettre dans une variable d'environnement SIM_BRIDGE__SUPABASE__SERVICEROLEKEY
-    /// ou dans user secrets, jamais commitée.
-    /// </summary>
-    public string ServiceRoleKey { get; set; } = "";
-}
-
-public record SessionPayload(Guid UserId);
+public record SessionPayload(string AccessToken, string SupabaseUrl, string AnonKey);
+public record FlightContextPayload(Guid DispatchId, Guid CompanyId, int EconomyPassengers, int BusinessPassengers);

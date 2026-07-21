@@ -379,10 +379,7 @@ function NewLoanForm({
       const { error: loanErr } = await supabase.rpc("take_company_loan", {
         p_company_id: company.id,
         p_principal: p,
-        p_monthly_payment: monthlyPayment,
-        p_remaining_amount: totalRepaid,
         p_total_months: m,
-        p_interest_rate: interestRate,
       });
       if (loanErr) throw loanErr;
 

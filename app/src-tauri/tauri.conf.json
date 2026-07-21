@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:5055 ws://127.0.0.1:5055 https://*.supabase.co wss://*.supabase.co https://www.simbrief.com; img-src 'self' asset: http://asset.localhost data: blob: https://*.basemaps.cartocdn.com; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     }
   },
   "bundle": {

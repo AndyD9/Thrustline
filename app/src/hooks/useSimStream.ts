@@ -5,7 +5,7 @@ import {
   HubConnectionState,
   LogLevel,
 } from "@microsoft/signalr";
-import { SIM_HUB_URL, waitForBridge } from "@/lib/simBridge";
+import { getBridgeInstanceToken, SIM_HUB_URL, waitForBridge } from "@/lib/simBridge";
 
 export interface SimData {
   timestamp: string;
@@ -146,8 +146,9 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
       const ready = await waitForBridge(3, 3_000);
       if (!ready || cancelled) return;
 
+      const bridgeToken = await getBridgeInstanceToken();
       const conn = new HubConnectionBuilder()
-        .withUrl(SIM_HUB_URL)
+        .withUrl(`${SIM_HUB_URL}?bridge_token=${encodeURIComponent(bridgeToken)}`)
         .withAutomaticReconnect([0, 2_000, 5_000, 10_000, 10_000])
         .configureLogging(LogLevel.Warning)
         .build();

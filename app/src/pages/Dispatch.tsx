@@ -19,6 +19,7 @@ import OFPSummary from "@/components/OFPSummary";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import BoardingProgressPanel from "@/components/BoardingProgressPanel";
 import { computeBoardingProgress } from "@/lib/boarding";
+import { setActiveFlightContext } from "@/lib/simBridge";
 
 const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: string }> = {
   pending:    { bg: "bg-slate-500/10 border-slate-500/20",   text: "text-slate-300",   dot: "bg-slate-400" },
@@ -133,6 +134,12 @@ export default function DispatchPage() {
       return false;
     }
     if (status === "flying") {
+      await setActiveFlightContext({
+        dispatchId: dispatch.id,
+        companyId: dispatch.company_id,
+        economyPassengers: dispatch.boarded_pax_eco,
+        businessPassengers: dispatch.boarded_pax_biz,
+      });
       await supabase.from("schedule_legs").update({ status: "flying" }).eq("dispatch_id", id);
     } else if (status === "cancelled") {
       await supabase.from("schedule_legs").update({ status: "available", dispatch_id: null }).eq("dispatch_id", id);
