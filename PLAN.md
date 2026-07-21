@@ -66,6 +66,7 @@ Tauri shell (Rust)
 - [x] **Dashboard** — KPIs (capital, sim status, last landing), flight in progress
 - [x] **Flights** — historique complet avec table (route, distance, duration, fuel, revenue, net)
 - [x] **Fleet** — cards avions avec health bar, cycles/hours, add form, set active
+- [x] **Sortie de flotte** — vente courtier des avions possedes et restitution anticipee payante des credit-bails
 - [x] **Dispatch** — liste missions avec badges status, actions (dispatch → flying → completed), new dispatch form
 - [x] **Crew** — table avec rank/status, aircraft assignment, hire form avec random names
 - [x] **Finances** — summary cards, cashflow chart (recharts), loans, transaction ledger
@@ -198,7 +199,12 @@ Ordre d'implementation : 5.3 → 5.2 → 5.4 → 5.1
 - [x] Un seul leg disponible a la fois, transforme en dispatch a la demande
 - [x] LandingProcessor : complete le leg, deplace l'avion et debloque le suivant
 - [x] Garde-fous DB : un planning actif et un vol flying par avion, validation de position
-- [ ] Horaires calendrier, temps au sol, overnight, contraintes crew et maintenance planifiee
+- [x] Horaires reels par leg et temps au sol configurable
+- [x] Equipage fixe captain + first officer + PNC selon le type d'avion par schedule passif, avec garde-fous de rang et de conflit
+- [x] Vols passifs avec progression, economie/usure, position carte et rattrapage au prochain lancement
+- [x] Vitesse des operations passives configurable (1x, 6x, 12x ou 24x)
+- [x] Economie passive basee sur la demande passagers, la capacite et les couts propres au type d'avion
+- [ ] Vue calendrier/timeline multi-avions, overnight et maintenance planifiee
 
 ---
 

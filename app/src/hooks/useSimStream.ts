@@ -20,6 +20,49 @@ export interface SimData {
   fuelTotalGal: number;
   onGround: boolean;
   aircraftTitle: string | null;
+  aircraftAtcModel: string | null;
+  aircraftAtcType: string | null;
+  aircraftRegistration: string | null;
+  aircraftCategory: string | null;
+  accelerationBodyX: number;
+  accelerationBodyY: number;
+  accelerationBodyZ: number;
+  gForce: number;
+  pitchDeg: number;
+  bankDeg: number;
+  rotationVelocityBodyX: number;
+  rotationVelocityBodyY: number;
+  rotationVelocityBodyZ: number;
+  seatbeltsOn: boolean;
+}
+
+export interface PassengerCohortPayload {
+  cabinClass: string;
+  passengerCount: number;
+  satisfaction: number;
+  comfort: number;
+  stress: number;
+  nausea: number;
+  entertainment: number;
+}
+
+export interface PassengerExperiencePayload {
+  timestamp: string;
+  isActive: boolean;
+  satisfaction: number;
+  comfort: number;
+  stress: number;
+  nausea: number;
+  entertainment: number;
+  currentEvent: string;
+  trend: "up" | "down" | "stable";
+  affectedPassengers: number;
+  abruptManeuvers: number;
+  turbulenceSeconds: number;
+  bestMoment: string;
+  worstMoment: string;
+  economy: PassengerCohortPayload;
+  business: PassengerCohortPayload;
 }
 
 export interface LandingEventPayload {
@@ -29,6 +72,7 @@ export interface LandingEventPayload {
   fuelUsedGal: number;
   durationMin: number;
   landingVsFpm: number;
+  passengerExperience: PassengerExperiencePayload | null;
 }
 
 export interface AcarsUpdatePayload {
@@ -64,6 +108,7 @@ export interface SimStreamState {
   currentPhase: string | null;
   /** Latest unlocked achievement (for toast display) */
   latestAchievement: AchievementPayload | null;
+  passengerExperience: PassengerExperiencePayload | null;
 }
 
 const initialState: SimStreamState = {
@@ -75,6 +120,7 @@ const initialState: SimStreamState = {
   acarsLog: [],
   currentPhase: null,
   latestAchievement: null,
+  passengerExperience: null,
 };
 
 /**
@@ -125,6 +171,7 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
             lastLanding: null,
             acarsLog: [],
             currentPhase: null,
+            passengerExperience: null,
           }),
         }));
       });
@@ -134,7 +181,11 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
       });
 
       conn.on("landing", (evt: LandingEventPayload) => {
-        setState((s) => ({ ...s, lastLanding: evt }));
+        setState((s) => ({
+          ...s,
+          lastLanding: evt,
+          passengerExperience: evt.passengerExperience ?? s.passengerExperience,
+        }));
         onLandingRef.current?.(evt);
       });
 
@@ -144,6 +195,10 @@ export function useSimStream(onLanding?: (evt: LandingEventPayload) => void): Si
 
       conn.on("phaseChange", (phase: string) => {
         setState((s) => ({ ...s, currentPhase: phase }));
+      });
+
+      conn.on("passengerExperience", (experience: PassengerExperiencePayload) => {
+        setState((s) => ({ ...s, passengerExperience: experience }));
       });
 
       conn.on("achievementUnlocked", (achievement: AchievementPayload) => {

@@ -8,6 +8,9 @@ public class DispatchRow : BaseModel
 {
     public const string StatusPending = "pending";
     public const string StatusDispatched = "dispatched";
+    public const string StatusPreflight = "preflight";
+    public const string StatusBoarding = "boarding";
+    public const string StatusReady = "ready";
     public const string StatusFlying = "flying";
     public const string StatusCompleted = "completed";
     public const string StatusCancelled = "cancelled";
@@ -41,6 +44,18 @@ public class DispatchRow : BaseModel
 
     [Column("pax_biz")]
     public int PaxBiz { get; set; }
+
+    [Column("boarded_pax_eco")]
+    public int BoardedPaxEco { get; set; }
+
+    [Column("boarded_pax_biz")]
+    public int BoardedPaxBiz { get; set; }
+
+    [Column("boarding_started_at")]
+    public DateTime? BoardingStartedAt { get; set; }
+
+    [Column("boarding_completed_at")]
+    public DateTime? BoardingCompletedAt { get; set; }
 
     [Column("cargo_kg")]
     public decimal CargoKg { get; set; }

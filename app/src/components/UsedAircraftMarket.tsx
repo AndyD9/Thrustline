@@ -3,11 +3,16 @@ import { Building2, CheckCircle2, Clock, Gauge, Loader2, MapPin, Plane, Search, 
 import { supabase } from "@/lib/supabase";
 import { aircraftTypeByIcao } from "@/data/aircraftTypes";
 import { loadImportedAirframes, syncImportedAirframe } from "@/lib/simbriefAirframes";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Company, NewAircraftCatalogItem, UsedAircraftListing } from "@/lib/database.types";
 
 const currency = (value: number) => value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 type MarketTab = "new" | "used";
 type Term = 12 | 24 | 36 | 48;
+type PurchaseRequest =
+  | { kind: "new"; item: NewAircraftCatalogItem }
+  | { kind: "used"; item: UsedAircraftListing }
+  | { kind: "lease"; item: UsedAircraftListing; term: Term; quote: ReturnType<typeof leaseQuote> };
 
 export function AircraftMarket({ company, onChanged }: { company: Company; onChanged: () => Promise<void> | void }) {
   const [tab, setTab] = useState<MarketTab>("new");
@@ -20,6 +25,7 @@ export function AircraftMarket({ company, onChanged }: { company: Company; onCha
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [purchaseRequest, setPurchaseRequest] = useState<PurchaseRequest | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -56,22 +62,16 @@ export function AircraftMarket({ company, onChanged }: { company: Company; onCha
     return !actionError;
   };
 
-  const buyNew = async (item: NewAircraftCatalogItem) => {
-    if (!window.confirm(`Order a new ${item.model_name} for ${currency(item.price)}? It will be delivered to ${company.hub_icao}.`)) return;
-    await runPurchase(item.id, item.model_name, () => supabase.rpc("buy_new_aircraft", { p_catalog_id: item.id, p_company_id: company.id }));
-  };
-
-  const buyUsed = async (item: UsedAircraftListing) => {
-    if (!window.confirm(`Buy ${item.model_name} (${item.registration}) for ${currency(item.price)}?`)) return;
-    const success = await runPurchase(item.id, `${item.model_name} ${item.registration}`, () => supabase.rpc("buy_used_aircraft_listing", { p_listing_id: item.id, p_company_id: company.id }));
-    if (success) setUsedAircraft((current) => current.filter((entry) => entry.id !== item.id));
-  };
-
-  const leaseUsed = async (item: UsedAircraftListing) => {
-    const quote = leaseQuote(item, term);
-    if (!window.confirm(`Start a ${term}-month lease-to-own for ${item.model_name}?\nDown payment: ${currency(quote.down)}\nMonthly payment: ${currency(quote.monthly)}`)) return;
-    const success = await runPurchase(item.id, `${item.model_name} ${item.registration}`, () => supabase.rpc("lease_used_aircraft_listing", { p_listing_id: item.id, p_company_id: company.id, p_term_months: term }));
-    if (success) setUsedAircraft((current) => current.filter((entry) => entry.id !== item.id));
+  const confirmPurchase = async () => {
+    if (!purchaseRequest) return;
+    const succeeded = purchaseRequest.kind === "new"
+      ? await runPurchase(purchaseRequest.item.id, purchaseRequest.item.model_name, () => supabase.rpc("buy_new_aircraft", { p_catalog_id: purchaseRequest.item.id, p_company_id: company.id }))
+      : purchaseRequest.kind === "used"
+        ? await runPurchase(purchaseRequest.item.id, `${purchaseRequest.item.model_name} ${purchaseRequest.item.registration}`, () => supabase.rpc("buy_used_aircraft_listing", { p_listing_id: purchaseRequest.item.id, p_company_id: company.id }))
+        : await runPurchase(purchaseRequest.item.id, `${purchaseRequest.item.model_name} ${purchaseRequest.item.registration}`, () => supabase.rpc("lease_used_aircraft_listing", { p_listing_id: purchaseRequest.item.id, p_company_id: company.id, p_term_months: purchaseRequest.term }));
+    if (!succeeded) return;
+    if (purchaseRequest.kind !== "new") setUsedAircraft((current) => current.filter((entry) => entry.id !== purchaseRequest.item.id));
+    setPurchaseRequest(null);
   };
 
   const visibleCount = tab === "new" ? filteredNew.length : filteredUsed.length;
@@ -109,7 +109,7 @@ export function AircraftMarket({ company, onChanged }: { company: Company; onCha
           return <article key={item.id} className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-4 hover:bg-white/[0.045]">
             <AircraftHeader name={item.model_name} subtitle={`${item.manufacturer} · ${item.icao_type}`} price={item.price} badge="Factory new" />
             <div className="mt-4 grid grid-cols-3 gap-2"><MarketStat icon={Gauge} label="Range" value={rangeNm ? `${rangeNm.toLocaleString()} nm` : "—"} /><MarketStat icon={Plane} label="Passengers" value={String(passengers)} /><MarketStat icon={MapPin} label="Delivery" value={company.hub_icao} /></div>
-            <div className="mt-3 flex items-center justify-between text-xs text-slate-500"><span>100% condition · 0 hours · 0 cycles</span><ActionButton loading={processingId === item.id} disabled={!affordable || processingId !== null} onClick={() => void buyNew(item)} label={affordable ? "Buy new" : "Insufficient capital"} /></div>
+            <div className="mt-3 flex items-center justify-between text-xs text-slate-500"><span>100% condition · 0 hours · 0 cycles</span><ActionButton loading={processingId === item.id} disabled={!affordable || processingId !== null} onClick={() => setPurchaseRequest({ kind: "new", item })} label={affordable ? "Buy new" : "Insufficient capital"} /></div>
           </article>;
         })}</div>
       ) : (
@@ -119,15 +119,26 @@ export function AircraftMarket({ company, onChanged }: { company: Company; onCha
             <AircraftHeader name={item.model_name} subtitle={`${item.icao_type} · ${item.registration}`} price={item.price} badge={`${item.manufacture_year}`} />
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"><MarketStat icon={Clock} label="Hours" value={item.total_hours.toLocaleString()} /><MarketStat icon={Gauge} label="Cycles" value={item.cycles.toLocaleString()} /><MarketStat icon={Wrench} label="Condition" value={`${item.health_pct.toFixed(0)}%`} /><MarketStat icon={MapPin} label="Location" value={item.location_icao} /></div>
             <div className="mt-3 rounded-lg border border-brand-500/10 bg-brand-500/[0.03] px-3 py-2 text-xs"><div className="flex justify-between text-slate-400"><span>Lease-to-own · {term} months · {quote.apr.toFixed(1)}% APR</span><span className="font-mono text-brand-300">{currency(quote.monthly)}/mo</span></div><div className="mt-1 text-[10px] text-slate-600">10% down payment: {currency(quote.down)} · Ownership transfers after final payment</div></div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className="mr-auto flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" />{item.seller_name}</span><ActionButton secondary loading={processingId === item.id} disabled={!canLease || processingId !== null} onClick={() => void leaseUsed(item)} label={canLease ? "Lease to own" : "Cannot fund deposit"} /><ActionButton loading={processingId === item.id} disabled={!affordable || processingId !== null} onClick={() => void buyUsed(item)} label={affordable ? "Buy outright" : "Insufficient capital"} /></div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className="mr-auto flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" />{item.seller_name}</span><ActionButton secondary loading={processingId === item.id} disabled={!canLease || processingId !== null} onClick={() => setPurchaseRequest({ kind: "lease", item, term, quote })} label={canLease ? "Lease to own" : "Cannot fund deposit"} /><ActionButton loading={processingId === item.id} disabled={!affordable || processingId !== null} onClick={() => setPurchaseRequest({ kind: "used", item })} label={affordable ? "Buy outright" : "Insufficient capital"} /></div>
           </article>;
         })}</div>
       )}
+      <ConfirmDialog
+        open={purchaseRequest !== null}
+        title={purchaseRequest?.kind === "lease" ? "Start lease-to-own?" : purchaseRequest?.kind === "new" ? "Order new aircraft?" : "Buy aircraft?"}
+        description={purchaseRequest ? <PurchaseSummary request={purchaseRequest} hubIcao={company.hub_icao} /> : null}
+        confirmLabel={purchaseRequest?.kind === "lease" ? "Start lease" : purchaseRequest?.kind === "new" ? "Order aircraft" : "Buy aircraft"}
+        loading={purchaseRequest !== null && processingId === purchaseRequest.item.id}
+        onCancel={() => { if (processingId === null) setPurchaseRequest(null); }}
+        onConfirm={() => void confirmPurchase()}
+      />
     </section>
   );
 }
 
 function leaseQuote(item: UsedAircraftListing, term: Term) { const down = item.price * 0.10; const age = Math.max(0, new Date().getFullYear() - item.manufacture_year); const apr = Math.min(12, 6 + age * 0.08 + (100 - item.health_pct) * 0.05); const rate = apr / 100 / 12; const monthly = ((item.price - down) * rate) / (1 - Math.pow(1 + rate, -term)); return { down, apr, monthly }; }
+function PurchaseSummary({ request, hubIcao }: { request: PurchaseRequest; hubIcao: string }) { return <div className="space-y-3"><p>{request.kind === "new" ? `A factory-new ${request.item.model_name} will be delivered to ${hubIcao}.` : `${request.item.model_name} (${request.item.registration}) will join your fleet.`}</p><div className="space-y-1 rounded-xl bg-white/[0.03] p-3 font-mono text-xs">{request.kind === "lease" ? <><QuoteRow label="Term" value={`${request.term} months`} /><QuoteRow label="Down payment" value={currency(request.quote.down)} strong /><QuoteRow label="Monthly payment" value={`${currency(request.quote.monthly)}/mo`} /><QuoteRow label="APR" value={`${request.quote.apr.toFixed(1)}%`} /></> : <QuoteRow label="Purchase price" value={currency(request.item.price)} strong />}</div></div>; }
+function QuoteRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) { return <div className={`flex justify-between gap-4 ${strong ? "border-t border-white/[0.06] pt-2 text-white" : "text-slate-400"}`}><span>{label}</span><span className={strong ? "font-bold text-white" : "text-slate-200"}>{value}</span></div>; }
 function filterAndSort<T extends { price: number; icao_type: string; model_name: string }>(items: T[], query: string, sort: "price_asc" | "price_desc" | "health") { const needle = query.trim().toLowerCase(); return [...items].filter((item) => !needle || Object.values(item).some((value) => typeof value === "string" && value.toLowerCase().includes(needle))).sort((a, b) => sort === "health" && "health_pct" in a && "health_pct" in b ? Number(b.health_pct) - Number(a.health_pct) : sort === "price_desc" ? b.price - a.price : a.price - b.price); }
 function TabButton({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: typeof Plane; label: string }) { return <button onClick={onClick} className={`flex items-center gap-2 border-b-2 px-1 pb-2 text-xs font-semibold ${active ? "border-brand-400 text-brand-300" : "border-transparent text-slate-500 hover:text-slate-300"}`}><Icon className="h-3.5 w-3.5" />{label}</button>; }
 function AircraftHeader({ name, subtitle, price, badge }: { name: string; subtitle: string; price: number; badge: string }) { return <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-500/10"><Plane className="h-5 w-5 text-brand-300" /></div><div><div className="font-semibold text-white">{name}</div><div className="font-mono text-xs text-slate-500">{subtitle}</div></div></div><div className="text-right"><div className="font-mono text-lg font-bold text-white">{currency(price)}</div><div className="text-[10px] uppercase tracking-wider text-slate-500">{badge}</div></div></div>; }

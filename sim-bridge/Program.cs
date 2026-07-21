@@ -48,6 +48,7 @@ builder.Services.AddSingleton<MaintenanceService>();
 builder.Services.AddSingleton<LandingGradeService>();
 builder.Services.AddSingleton<FuelValidationService>();
 builder.Services.AddSingleton<PaxSatisfactionService>();
+builder.Services.AddSingleton<PassengerExperienceService>();
 builder.Services.AddSingleton<AcarsService>();
 builder.Services.AddSingleton<AchievementService>();
 builder.Services.AddSingleton<CompanyBonusService>();

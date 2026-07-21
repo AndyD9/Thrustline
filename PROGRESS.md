@@ -58,8 +58,10 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | Dashboard | DONE | KPIs, flight network map (arcs courbes), charts, recent flights |
 | Flights | DONE | Table historique (route, distance, duration, fuel, revenue, net) |
 | Fleet | DONE | Cards avions, health bar, AircraftTypePicker, set active |
+| Maintenance flotte | DONE | Devis, confirmation, debit atomique, transaction et remise a 100 %, avec blocage en operation |
 | Marche d'occasion | DONE | Annonces partagees, filtres, etat/heures/prix/localisation, achat atomique avec debit et transaction |
 | Marche avions + credit-bail | DONE | Achat neuf, achat occasion, lease-to-own 12-48 mois, impayes, rachat anticipe et transfert automatique de propriete |
+| Vente + restitution flotte | DONE | Estimation serveur, commission courtier, frais de restitution, blocages operationnels et remplacement de l'avion actif |
 | Profils SimBrief dans le marche | DONE | Chaque profil Settings genere une offre neuve et deux occasions privees, achetables ou finançables |
 | Dispatch | DONE | SimBrief-first workflow, OFP inline, route preview, callsign |
 | Crew | DONE | Table rank/status, aircraft assignment, hire form, random names |
@@ -72,6 +74,8 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | Feature | Status | Details |
 |---|---|---|
 | NativeSimConnectClient | DONE | `#if HAS_SIMCONNECT`, Win32 message pump, 10 SimVars, retry 5s |
+| Verification avion MSFS | DONE | Modele/type/immatriculation SimConnect compares au dispatch et a l'OFP dans Live Flight |
+| Demarrage de vol securise | DONE | Passage en flying autorise uniquement avec MSFS actif et avion detecte au sol |
 | Sidecar auto-spawn | DONE | `build-sidecar.ps1`, lib.rs child management, kill on close |
 | Discord Rich Presence | DONE | Phase ACARS et route du vol publiees dynamiquement par Tauri, reconnexion automatique |
 | Supabase Realtime | DONE | CompanyContext subscribe, capital updates live |
@@ -102,9 +106,25 @@ f8ee5c1 fix(app): aircraft icon rotates to match flight heading
 | Schedule generator | DONE | Vols/rotations/heures max/duree max, range avion, retour hub optionnel |
 | No teleport | DONE | Position avion persistante et validation DB au passage en flying |
 | Schedule UI | DONE | Preview carte + rotations, sauvegarde, annulation, prochain vol disponible |
+| Gestion des schedules | DONE | Affectation avion visible dans Schedule/Fleet et suppression securisee avec confirmation |
 | Dispatch integration | DONE | Creation d'un seul dispatch depuis le prochain leg |
 | Landing progression | DONE | LandingProcessor complete le leg, deplace l'avion et debloque le suivant |
 | Supabase schema | DONE | schedules, schedule_rotations, schedule_legs, index et policies RLS |
+| Operations passives | DONE | Horaires, temps au sol, captain/FO et PNC variables selon l'avion, progression automatique, economie/usure et rattrapage hors ligne |
+| Acceleration passive | DONE | Echelle 1x/6x/12x/24x, 12x par defaut, sans reduire heures de vol, usure ni revenus |
+| Visibilite flotte passive | DONE | Prochain leg/equipage dans Fleet et avion interpole sur la carte Schedule |
+| Carte Dashboard passive | DONE | Tous les avions passifs en vol, routes et info-bulles, actualises toutes les 15 secondes |
+| Economie passive par passagers | DONE | Demande deterministe, capacite avion, tarifs Eco/Business, consommation par famille, frais aeroportuaires et maintenance variable |
+
+### Passenger Experience (MVP)
+
+| Feature | Status | Details |
+|---|---|---|
+| Telemetrie cabine | DONE | Accelerations, G-force, pitch/bank, rotations et ceintures via SimConnect, snapshots mouvement limites a 10 Hz |
+| Simulation temps reel | DONE | Cohortes Economy/Business, confort, stress, nausee, divertissement, turbulences et manoeuvres brusques |
+| SignalR + Live Flight | DONE | Etat cabine diffuse a 2 Hz, panneau temps reel et tendances visibles pendant le vol |
+| Bilan et persistence | DONE | Atterrissage integre au score final et `flights.pax_satisfaction` alimente par la simulation, avec fallback historique |
+| Embarquement passagers | DONE | Progression 30-90s persistante, Business prioritaire, compteurs par cabine, passage automatique a ready et verrouillage du depart |
 
 ---
 

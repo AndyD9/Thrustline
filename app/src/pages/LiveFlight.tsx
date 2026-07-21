@@ -6,9 +6,11 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useUnits } from "@/contexts/UnitsContext";
 import { airportByIcao } from "@/data/airports";
 import FlightMap from "@/components/FlightMap";
+import PassengerCabinPanel from "@/components/PassengerCabinPanel";
+import AircraftVerificationPanel from "@/components/AircraftVerificationPanel";
 import type { Dispatch } from "@/lib/database.types";
 import type { Airport } from "@/data/airports";
-import type { AcarsUpdatePayload } from "@/hooks/useSimStream";
+import type { AcarsUpdatePayload, PassengerExperiencePayload } from "@/hooks/useSimStream";
 import { computeGrade } from "@/lib/landingGrade";
 import {
   ArrowLeft,
@@ -33,7 +35,7 @@ export default function LiveFlight() {
   const [params] = useSearchParams();
   const dispatchId = params.get("dispatch");
 
-  const { latest, simActive, lastLanding, acarsLog, currentPhase } = useSim();
+  const { latest, simActive, lastLanding, acarsLog, currentPhase, passengerExperience } = useSim();
   const { company } = useCompany();
   const { fmt } = useUnits();
 
@@ -176,6 +178,8 @@ export default function LiveFlight() {
             </div>
           </div>
 
+          <AircraftVerificationPanel dispatch={dispatch} sim={simActive ? latest : null} />
+
           {/* Progress info */}
           {latest && !latest.onGround && origin && destination && (
             <div className="rounded-xl border border-white/[0.08] bg-[#0a0f18]/90 p-4 backdrop-blur-md">
@@ -204,6 +208,12 @@ export default function LiveFlight() {
               <InstrumentRow icon={Fuel} label="FUEL" value={fmt.fuel(latest.fuelTotalGal)} />
             </div>
           </div>
+        </div>
+      )}
+
+      {passengerExperience && !landed && (
+        <div className="absolute right-4 top-80 z-10 w-64">
+          <PassengerCabinPanel experience={passengerExperience} />
         </div>
       )}
 
@@ -243,6 +253,7 @@ export default function LiveFlight() {
         <LandingOverlay
           lastLanding={lastLanding}
           fmt={fmt}
+          passengerExperience={passengerExperience}
           goBack={goBack}
         />
       )}
@@ -294,10 +305,12 @@ function InstrumentRow({ icon: Icon, label, value }: { icon: typeof Plane; label
 function LandingOverlay({
   lastLanding,
   fmt,
+  passengerExperience,
   goBack,
 }: {
   lastLanding: { distanceNm: number; landingVsFpm: number; durationMin: number };
   fmt: { distance: (v: number) => string; vs: (v: number) => string };
+  passengerExperience: PassengerExperiencePayload | null;
   goBack: () => void;
 }) {
   const grade = computeGrade(lastLanding.landingVsFpm);
@@ -332,8 +345,12 @@ function LandingOverlay({
             <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wider text-slate-500">
               <Users className="h-3 w-3" /> Pax
             </div>
-            <div className="font-mono text-lg font-bold text-white">--</div>
-            <div className="text-[10px] text-slate-500">After sync</div>
+            <div className="font-mono text-lg font-bold text-white">
+              {passengerExperience ? `${Math.round(passengerExperience.satisfaction)}%` : "--"}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {passengerExperience ? passengerExperience.currentEvent : "After sync"}
+            </div>
           </div>
         </div>
         <button

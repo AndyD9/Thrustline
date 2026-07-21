@@ -26,7 +26,7 @@ export type Json =
   | Json[];
 
 export type AircraftOwnership = "leased" | "owned";
-export type AircraftLeaseStatus = "active" | "overdue" | "paid_off";
+export type AircraftLeaseStatus = "active" | "overdue" | "paid_off" | "terminated";
 export type DispatchStatus =
   | "pending"
   | "dispatched"
@@ -40,6 +40,7 @@ export type CrewRank = "captain" | "first_officer" | "cabin_crew";
 export type CrewStatus = "available" | "flying" | "resting";
 export type ScheduleStatus = "planned" | "active" | "completed" | "cancelled";
 export type ScheduleLegStatus = "planned" | "available" | "dispatched" | "flying" | "completed" | "cancelled";
+export type ScheduleOperationMode = "player" | "passive";
 export type GameEventType =
   | "fuel_spike"
   | "fuel_drop"
@@ -54,6 +55,7 @@ export type TransactionType =
   | "fuel"
   | "landing_fee"
   | "lease"
+  | "lease_termination"
   | "maintenance"
   | "salary"
   | "purchase"
@@ -91,6 +93,8 @@ export type Aircraft = {
   ownership: AircraftOwnership;
   purchase_price: number;
   current_airport_icao: string | null;
+  disposed_at: string | null;
+  disposal_reason: "sold" | "lease_returned" | null;
   created_at: string;
   updated_at: string;
 };
@@ -163,10 +167,22 @@ export type FlightSchedule = {
   target_flights: number;
   target_rotations: number;
   return_to_hub: boolean;
+  captain_id: string | null;
+  first_officer_id: string | null;
+  cabin_crew_required: number;
+  passive_enabled: boolean;
+  ground_time_minutes: number;
+  time_scale: number;
   generation_settings: Json;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+};
+
+export type ScheduleCabinCrew = {
+  schedule_id: string;
+  crew_member_id: string;
+  created_at: string;
 };
 
 export type ScheduleRotation = {
@@ -191,6 +207,11 @@ export type ScheduleLeg = {
   distance_nm: number;
   estimated_minutes: number;
   flight_number: string;
+  operation_mode: ScheduleOperationMode;
+  scheduled_departure_at: string | null;
+  scheduled_arrival_at: string | null;
+  actual_departure_at: string | null;
+  actual_arrival_at: string | null;
   status: ScheduleLegStatus;
   created_at: string;
   completed_at: string | null;
@@ -234,6 +255,7 @@ export type CrewMember = {
   salary_mo: number;
   duty_hours: number;
   max_duty_h: number;
+  duty_available_at: string | null;
   status: CrewStatus;
   created_at: string;
   updated_at: string;
@@ -250,6 +272,10 @@ export type Dispatch = {
   icao_type: string;
   pax_eco: number;
   pax_biz: number;
+  boarded_pax_eco: number;
+  boarded_pax_biz: number;
+  boarding_started_at: string | null;
+  boarding_completed_at: string | null;
   cargo_kg: number;
   estim_fuel_lbs: number;
   cruise_alt: number;
@@ -279,6 +305,11 @@ export type Flight = {
   planned_fuel_gal: number | null;
   fuel_accuracy_pct: number | null;
   pax_satisfaction: number | null;
+  pax_eco: number;
+  pax_biz: number;
+  load_factor_pct: number | null;
+  maintenance_cost: number;
+  operation_mode: ScheduleOperationMode;
   started_at: string;
   completed_at: string;
   created_at: string;
@@ -410,6 +441,7 @@ export type Database = {
       schedules:            Table<FlightSchedule>;
       schedule_rotations:   Table<ScheduleRotation>;
       schedule_legs:        Table<ScheduleLeg>;
+      schedule_cabin_crew:  Table<ScheduleCabinCrew>;
       routes:               Table<Route>;
       reputations:          Table<Reputation>;
       crew_members:         Table<CrewMember>;
@@ -440,6 +472,26 @@ export type Database = {
       buyout_aircraft_lease: {
         Args: { p_lease_id: string; p_company_id: string };
         Returns: undefined;
+      };
+      aircraft_disposal_quote: {
+        Args: { p_aircraft_id: string; p_company_id: string };
+        Returns: Json;
+      };
+      sell_owned_aircraft: {
+        Args: { p_aircraft_id: string; p_company_id: string };
+        Returns: Json;
+      };
+      terminate_aircraft_lease: {
+        Args: { p_lease_id: string; p_company_id: string };
+        Returns: Json;
+      };
+      aircraft_maintenance_quote: {
+        Args: { p_aircraft_id: string; p_company_id: string };
+        Returns: Json;
+      };
+      perform_aircraft_maintenance: {
+        Args: { p_aircraft_id: string; p_company_id: string };
+        Returns: Json;
       };
       process_aircraft_lease_payments: {
         Args: { p_company_id: string; p_months: number };

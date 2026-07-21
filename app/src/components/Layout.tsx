@@ -1,23 +1,42 @@
+import { useCallback, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { SimStatusBadge } from "./SimStatusBadge";
 import { LiveFlightBar } from "./LiveFlightBar";
 import { AchievementToast } from "./AchievementToast";
 import { useCompany } from "@/contexts/CompanyContext";
-import { X, Receipt } from "lucide-react";
+import { Menu, X, Receipt } from "lucide-react";
 
 export function Layout() {
   const { billingResult, clearBillingResult } = useCompany();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-surface-0">
       <AchievementToast />
-      <Sidebar />
+      {mobileNavOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={closeMobileNav}
+          aria-label="Close navigation"
+        />
+      )}
+      <Sidebar mobileOpen={mobileNavOpen} onMobileClose={closeMobileNav} />
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex items-center justify-between px-6 py-4">
-          <div />
+        <header className="flex items-center justify-between px-4 py-4 sm:px-6">
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2 text-slate-400 hover:bg-white/[0.06] hover:text-slate-200 lg:hidden"
+            aria-label="Open navigation"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="hidden lg:block" />
           <SimStatusBadge />
         </header>
 
@@ -46,7 +65,7 @@ export function Layout() {
 
         <LiveFlightBar />
 
-        <main className="flex-1 overflow-y-auto px-6 pb-6">
+        <main className="flex-1 overflow-y-auto px-4 pb-6 sm:px-6">
           <Outlet />
         </main>
       </div>

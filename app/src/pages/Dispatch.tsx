@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useSim } from "@/contexts/SimContext";
 import { Select } from "@/components/Select";
 import { Plane, Plus, X, Play, Ban, Trash2, Radio, Users, Mountain, AlertTriangle, ExternalLink, Download, Loader2, FileText, Megaphone, Tag, ClipboardCheck, UserRoundCheck, CircleCheck, Undo2 } from "lucide-react";
 import type { Aircraft, Dispatch as DispatchT, DispatchStatus, MarketingCampaign } from "@/lib/database.types";
@@ -15,6 +16,9 @@ import { useUnits } from "@/contexts/UnitsContext";
 import { computePaxDemand } from "@/lib/paxDemand";
 import { open as shellOpen } from "@tauri-apps/plugin-shell";
 import OFPSummary from "@/components/OFPSummary";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import BoardingProgressPanel from "@/components/BoardingProgressPanel";
+import { computeBoardingProgress } from "@/lib/boarding";
 
 const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: string }> = {
   pending:    { bg: "bg-slate-500/10 border-slate-500/20",   text: "text-slate-300",   dot: "bg-slate-400" },
@@ -29,6 +33,7 @@ const statusConfig: Record<DispatchStatus, { bg: string; text: string; dot: stri
 
 export default function DispatchPage() {
   const { company } = useCompany();
+  const { latest, simActive } = useSim();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [dispatches, setDispatches] = useState<DispatchT[]>([]);
@@ -37,6 +42,11 @@ export default function DispatchPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingDispatch, setEditingDispatch] = useState<DispatchT | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [dispatchToDelete, setDispatchToDelete] = useState<DispatchT | null>(null);
+  const [dispatchToReset, setDispatchToReset] = useState<DispatchT | null>(null);
+  const [confirmingAction, setConfirmingAction] = useState(false);
+  const [boardingNow, setBoardingNow] = useState(Date.now());
+  const completingBoarding = useRef(new Set<string>());
 
   const fetchDispatches = async () => {
     if (!company) return;
@@ -57,6 +67,7 @@ export default function DispatchPage() {
       .from("aircraft")
       .select("*")
       .eq("company_id", company.id)
+      .is("disposed_at", null)
       .order("name");
     setAircraft((data as Aircraft[]) ?? []);
   };
@@ -76,12 +87,50 @@ export default function DispatchPage() {
     }
   }, [dispatches, searchParams]);
 
-  const updateStatus = async (id: string, status: DispatchStatus) => {
+  const updateStatus = async (id: string, status: DispatchStatus): Promise<boolean> => {
     setActionError(null);
-    const { error: updateError } = await supabase.from("dispatches").update({ status }).eq("id", id);
+    const dispatch = dispatches.find((item) => item.id === id);
+    if (!dispatch) {
+      setActionError("Dispatch not found.");
+      return false;
+    }
+    if (status === "flying" && (
+      dispatch.status !== "ready" ||
+      dispatch.boarded_pax_eco !== dispatch.pax_eco ||
+      dispatch.boarded_pax_biz !== dispatch.pax_biz
+    )) {
+      setActionError("Passenger boarding must be complete before starting the flight.");
+      return false;
+    }
+    if (status === "flying" && (!simActive || !latest?.onGround)) {
+      setActionError(
+        !simActive
+          ? "Start MSFS and load an aircraft before starting the flight."
+          : "The aircraft must be detected on the ground before the flight can start.",
+      );
+      return false;
+    }
+    const now = new Date().toISOString();
+    const statusUpdate: Partial<DispatchT> = { status };
+    if (status === "boarding") {
+      statusUpdate.boarded_pax_eco = 0;
+      statusUpdate.boarded_pax_biz = 0;
+      statusUpdate.boarding_started_at = now;
+      statusUpdate.boarding_completed_at = null;
+    } else if (status === "ready") {
+      statusUpdate.boarded_pax_eco = dispatch.pax_eco;
+      statusUpdate.boarded_pax_biz = dispatch.pax_biz;
+      statusUpdate.boarding_completed_at = now;
+    } else if (status === "preflight") {
+      statusUpdate.boarded_pax_eco = 0;
+      statusUpdate.boarded_pax_biz = 0;
+      statusUpdate.boarding_started_at = null;
+      statusUpdate.boarding_completed_at = null;
+    }
+    const { error: updateError } = await supabase.from("dispatches").update(statusUpdate).eq("id", id);
     if (updateError) {
       setActionError(updateError.message);
-      return;
+      return false;
     }
     if (status === "flying") {
       await supabase.from("schedule_legs").update({ status: "flying" }).eq("dispatch_id", id);
@@ -91,12 +140,27 @@ export default function DispatchPage() {
       await supabase.from("schedule_legs").update({ status: "dispatched" }).eq("dispatch_id", id);
     }
     await fetchDispatches();
+    return true;
   };
+
+  useEffect(() => {
+    if (!dispatches.some((dispatch) => dispatch.status === "boarding")) return;
+    const timer = window.setInterval(() => setBoardingNow(Date.now()), 500);
+    return () => window.clearInterval(timer);
+  }, [dispatches]);
+
+  useEffect(() => {
+    for (const dispatch of dispatches) {
+      if (dispatch.status !== "boarding" || completingBoarding.current.has(dispatch.id)) continue;
+      if (!computeBoardingProgress(dispatch, boardingNow).complete) continue;
+      completingBoarding.current.add(dispatch.id);
+      void updateStatus(dispatch.id, "ready").finally(() => completingBoarding.current.delete(dispatch.id));
+    }
+  }, [boardingNow, dispatches]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteDispatch = async (dispatch: DispatchT) => {
     if (dispatch.status === "flying" || dispatch.status === "completed") return;
-    if (!window.confirm(`Delete dispatch ${dispatch.flight_number}?`)) return;
-
+    setConfirmingAction(true);
     setActionError(null);
 
     // A scheduled leg must become available again before its dispatch is removed.
@@ -106,6 +170,7 @@ export default function DispatchPage() {
       .eq("dispatch_id", dispatch.id);
     if (legReadError) {
       setActionError(legReadError.message);
+      setConfirmingAction(false);
       return;
     }
 
@@ -116,6 +181,7 @@ export default function DispatchPage() {
         .eq("dispatch_id", dispatch.id);
       if (legUpdateError) {
         setActionError(legUpdateError.message);
+        setConfirmingAction(false);
         return;
       }
     }
@@ -131,10 +197,13 @@ export default function DispatchPage() {
         .update({ status: leg.status, dispatch_id: dispatch.id })
         .eq("id", leg.id)));
       setActionError(deleteError.message);
+      setConfirmingAction(false);
       return;
     }
 
     await fetchDispatches();
+    setConfirmingAction(false);
+    setDispatchToDelete(null);
   };
 
   if (!company) return null;
@@ -252,43 +321,55 @@ export default function DispatchPage() {
                         }} />
                         <ActionBtn label="Dispatch" icon={Play} onClick={() => void updateStatus(d.id, "dispatched")} />
                         <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
-                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => setDispatchToDelete(d)} />
                       </>
                     )}
                     {d.status === "dispatched" && (
                       <>
                         <ActionBtn label="Start pre-flight" icon={ClipboardCheck} variant="primary" onClick={() => void updateStatus(d.id, "preflight")} />
-                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => setDispatchToDelete(d)} />
                       </>
                     )}
                     {d.status === "preflight" && (
                       <>
                         <ActionBtn label="Start boarding" icon={Users} variant="primary" onClick={() => void updateStatus(d.id, "boarding")} />
                         <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
-                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => setDispatchToDelete(d)} />
                       </>
                     )}
                     {d.status === "boarding" && (
                       <>
-                        <ActionBtn label="Boarding complete" icon={UserRoundCheck} variant="primary" onClick={() => void updateStatus(d.id, "ready")} />
+                        <ActionBtn label="Finish now" icon={UserRoundCheck} variant="primary" onClick={() => void updateStatus(d.id, "ready")} />
                         <ActionBtn label="Back to pre-flight" icon={Undo2} onClick={() => void updateStatus(d.id, "preflight")} />
                         <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
-                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => setDispatchToDelete(d)} />
                       </>
                     )}
                     {d.status === "ready" && (
                       <>
-                        <ActionBtn label="Start flight" icon={CircleCheck} variant="primary" onClick={async () => {
-                          await updateStatus(d.id, "flying");
-                          navigate(`/live-flight?dispatch=${d.id}`);
-                        }} />
+                        <ActionBtn
+                          label="Start flight"
+                          icon={CircleCheck}
+                          variant="primary"
+                          disabled={!simActive || !latest?.onGround}
+                          title={!simActive
+                            ? "Waiting for MSFS and a loaded aircraft"
+                            : !latest?.onGround
+                              ? "The aircraft must be on the ground"
+                              : "Start flight"}
+                          onClick={async () => {
+                            if (await updateStatus(d.id, "flying")) {
+                              navigate(`/live-flight?dispatch=${d.id}`);
+                            }
+                          }}
+                        />
                         <ActionBtn label="Back to boarding" icon={Undo2} onClick={() => void updateStatus(d.id, "boarding")} />
                         <ActionBtn label="Cancel" icon={Ban} variant="danger" onClick={() => void updateStatus(d.id, "cancelled")} />
-                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                        <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => setDispatchToDelete(d)} />
                       </>
                     )}
                     {d.status === "cancelled" && (
-                      <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => void deleteDispatch(d)} />
+                      <ActionBtn label="Delete" icon={Trash2} variant="danger" onClick={() => setDispatchToDelete(d)} />
                     )}
                     {d.status === "flying" && (
                       <>
@@ -296,15 +377,22 @@ export default function DispatchPage() {
                           <Radio className="h-3.5 w-3.5 animate-pulse" />
                           In flight
                         </span>
-                        <ActionBtn label="Not departed" icon={Undo2} variant="danger" onClick={() => {
-                          if (window.confirm("The aircraft has not taken off? Return this dispatch to pre-flight?")) {
-                            void updateStatus(d.id, "preflight");
-                          }
-                        }} />
+                        <ActionBtn label="Not departed" icon={Undo2} variant="danger" onClick={() => setDispatchToReset(d)} />
                       </>
                     )}
                   </div>
                 </div>
+
+                {d.status === "boarding" && (
+                  <BoardingProgressPanel dispatch={d} nowMs={boardingNow} />
+                )}
+
+                {d.status === "ready" && (
+                  <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.035] px-4 py-3 text-xs text-emerald-300">
+                    <UserRoundCheck className="h-4 w-4" />
+                    Boarding complete — {d.boarded_pax_eco + d.boarded_pax_biz} passengers on board
+                  </div>
+                )}
 
                 {savedOfp && ["dispatched", "preflight", "boarding", "ready", "flying"].includes(d.status) && (
                   <OFPSummary
@@ -342,6 +430,41 @@ export default function DispatchPage() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={dispatchToDelete !== null}
+        title="Delete dispatch?"
+        description={dispatchToDelete && (
+          <>
+            Dispatch <strong className="font-mono text-white">{dispatchToDelete.flight_number}</strong> for {dispatchToDelete.origin_icao} → {dispatchToDelete.dest_icao} will be permanently deleted.
+            A linked schedule leg will become available again.
+          </>
+        )}
+        confirmLabel="Delete dispatch"
+        destructive
+        loading={confirmingAction}
+        onCancel={() => setDispatchToDelete(null)}
+        onConfirm={() => {
+          if (dispatchToDelete) void deleteDispatch(dispatchToDelete);
+        }}
+      />
+
+      <ConfirmDialog
+        open={dispatchToReset !== null}
+        title="Return to pre-flight?"
+        description={dispatchToReset && (
+          <>
+            Only continue if <strong className="font-mono text-white">{dispatchToReset.flight_number}</strong> has not taken off. Its status will return to pre-flight.
+          </>
+        )}
+        confirmLabel="Return to pre-flight"
+        onCancel={() => setDispatchToReset(null)}
+        onConfirm={() => {
+          if (!dispatchToReset) return;
+          void updateStatus(dispatchToReset.id, "preflight");
+          setDispatchToReset(null);
+        }}
+      />
     </div>
   );
 }
@@ -362,11 +485,15 @@ function ActionBtn({
   icon: Icon,
   onClick,
   variant = "default",
+  disabled = false,
+  title,
 }: {
   label: string;
   icon: typeof Play;
   onClick: () => void;
   variant?: "default" | "primary" | "danger";
+  disabled?: boolean;
+  title?: string;
 }) {
   const variants = {
     default: "border border-white/[0.08] text-slate-300 hover:border-white/[0.15] hover:text-white",
@@ -376,7 +503,9 @@ function ActionBtn({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${variants[variant]}`}
+      disabled={disabled}
+      title={title}
+      className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${variants[variant]} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:shadow-none`}
     >
       <Icon className="h-3.5 w-3.5" />
       {label}

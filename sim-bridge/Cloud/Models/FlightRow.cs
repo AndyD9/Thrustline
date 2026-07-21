@@ -69,6 +69,21 @@ public class FlightRow : BaseModel
     [Column("pax_satisfaction")]
     public decimal? PaxSatisfaction { get; set; }
 
+    [Column("pax_eco")]
+    public int PaxEco { get; set; }
+
+    [Column("pax_biz")]
+    public int PaxBiz { get; set; }
+
+    [Column("load_factor_pct")]
+    public decimal? LoadFactorPct { get; set; }
+
+    [Column("maintenance_cost")]
+    public decimal MaintenanceCost { get; set; }
+
+    [Column("operation_mode")]
+    public string OperationMode { get; set; } = "player";
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 

@@ -33,6 +33,7 @@ public class LandingProcessor
     private readonly LandingGradeService _grade;
     private readonly FuelValidationService _fuelValidation;
     private readonly PaxSatisfactionService _paxSatisfaction;
+    private readonly PassengerExperienceService _passengerExperience;
     private readonly AcarsService _acars;
     private readonly AchievementService _achievements;
     private readonly CompanyBonusService _bonuses;
@@ -47,6 +48,7 @@ public class LandingProcessor
         LandingGradeService grade,
         FuelValidationService fuelValidation,
         PaxSatisfactionService paxSatisfaction,
+        PassengerExperienceService passengerExperience,
         AcarsService acars,
         AchievementService achievements,
         CompanyBonusService bonuses,
@@ -60,6 +62,7 @@ public class LandingProcessor
         _grade = grade;
         _fuelValidation = fuelValidation;
         _paxSatisfaction = paxSatisfaction;
+        _passengerExperience = passengerExperience;
         _acars = acars;
         _achievements = achievements;
         _bonuses = bonuses;
@@ -157,7 +160,10 @@ public class LandingProcessor
             // Landing grade, fuel validation, pax satisfaction (with catering bonus)
             var gradeResult = _grade.Compute(landingVsFpm);
             var fuelResult = _fuelValidation.Compute(fuelUsedGal, dispatch);
-            var paxSat = _paxSatisfaction.Compute(landingVsFpm, evt.DurationMin, dispatch, bonuses.PaxSatisfactionBonus);
+            var realtimePax = _passengerExperience.Completed;
+            var paxSat = realtimePax is not null
+                ? Math.Round(Math.Clamp((decimal)realtimePax.Satisfaction + bonuses.PaxSatisfactionBonus, 0m, 100m), 2)
+                : _paxSatisfaction.Compute(landingVsFpm, evt.DurationMin, dispatch, bonuses.PaxSatisfactionBonus);
 
             MaintenanceUpdate? maint = null;
             if (aircraft is not null)
@@ -193,6 +199,13 @@ public class LandingProcessor
                 PlannedFuelGal = fuelResult.PlannedFuelGal,
                 FuelAccuracyPct = fuelResult.FuelAccuracyPct,
                 PaxSatisfaction = paxSat,
+                PaxEco = dispatch.BoardedPaxEco,
+                PaxBiz = dispatch.BoardedPaxBiz,
+                LoadFactorPct = dispatch.PaxEco + dispatch.PaxBiz > 0
+                    ? Math.Round((dispatch.BoardedPaxEco + dispatch.BoardedPaxBiz) * 100m / (dispatch.PaxEco + dispatch.PaxBiz), 2)
+                    : 0,
+                MaintenanceCost = 0,
+                OperationMode = "player",
                 StartedAt = evt.Takeoff.Timestamp.UtcDateTime,
                 CompletedAt = evt.Touchdown.Timestamp.UtcDateTime,
             };

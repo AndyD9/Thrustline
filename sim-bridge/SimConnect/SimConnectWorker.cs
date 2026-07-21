@@ -19,6 +19,7 @@ public class SimConnectWorker : BackgroundService
     private readonly ISimClient _client;
     private readonly FlightDetector _detector;
     private readonly AcarsService _acars;
+    private readonly PassengerExperienceService _passengers;
     private readonly IHubContext<SimHub> _hub;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<SimConnectWorker> _log;
@@ -27,6 +28,7 @@ public class SimConnectWorker : BackgroundService
         ISimClient client,
         FlightDetector detector,
         AcarsService acars,
+        PassengerExperienceService passengers,
         IHubContext<SimHub> hub,
         IServiceScopeFactory scopeFactory,
         ILogger<SimConnectWorker> log)
@@ -34,6 +36,7 @@ public class SimConnectWorker : BackgroundService
         _client = client;
         _detector = detector;
         _acars = acars;
+        _passengers = passengers;
         _hub = hub;
         _scopeFactory = scopeFactory;
         _log = log;
@@ -46,6 +49,7 @@ public class SimConnectWorker : BackgroundService
 
         _detector.Takeoff += (_, data) =>
         {
+            _passengers.PrepareFlight(data.Timestamp);
             _ = _hub.Clients.All.SendAsync("takeoff", data, stoppingToken);
 
             // Start ACARS tracking for the active dispatch
@@ -75,6 +79,7 @@ public class SimConnectWorker : BackgroundService
                     if (dispatch is null) return;
 
                     _acars.StartFlight(dispatch.Id, company.Id);
+                    _passengers.StartFlight(dispatch.BoardedPaxEco, dispatch.BoardedPaxBiz, data.Timestamp);
                 }
                 catch (Exception ex)
                 {
@@ -85,8 +90,18 @@ public class SimConnectWorker : BackgroundService
 
         _detector.Landing += async (_, evt) =>
         {
+            var passengerExperience = _passengers.CompleteFlight(evt.LandingVsFpm, evt.Touchdown.Timestamp);
             // Broadcast UI d'abord (instant feedback)
-            await _hub.Clients.All.SendAsync("landing", evt, stoppingToken);
+            await _hub.Clients.All.SendAsync("landing", new
+            {
+                evt.Takeoff,
+                evt.Touchdown,
+                evt.DistanceNm,
+                evt.FuelUsedGal,
+                evt.DurationMin,
+                evt.LandingVsFpm,
+                PassengerExperience = passengerExperience,
+            }, stoppingToken);
 
             // Puis pipeline métier + persistence Supabase (hors thread SimConnect)
             _ = Task.Run(async () =>
@@ -126,6 +141,7 @@ public class SimConnectWorker : BackgroundService
         if (data.IsSimActive)
         {
             _acars.Ingest(data);
+            _passengers.Ingest(data);
         }
         _ = _hub.Clients.All.SendAsync("simData", data);
     }

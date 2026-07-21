@@ -30,6 +30,7 @@ interface FlightMapProps {
   /** Historical flight route arcs */
   routes?: RouteArc[];
   aircraft?: { lat: number; lon: number; heading: number };
+  aircrafts?: { id: string; lat: number; lon: number; heading: number; label?: string }[];
   height?: string;
   interactive?: boolean;
   zoomControlPosition?: "topleft" | "topright" | "bottomleft" | "bottomright";
@@ -136,9 +137,9 @@ function FitBounds({
   return null;
 }
 
-function AircraftMarker({ lat, lon, heading }: { lat: number; lon: number; heading: number }) {
+function AircraftMarker({ lat, lon, heading, label }: { lat: number; lon: number; heading: number; label?: string }) {
   const icon = useMemo(() => aircraftIcon(heading), [heading]);
-  return <Marker position={[lat, lon]} icon={icon} />;
+  return <Marker position={[lat, lon]} icon={icon}>{label && <Tooltip direction="top" offset={[0, -10]} className="airport-tooltip">{label}</Tooltip>}</Marker>;
 }
 
 export default function FlightMap({
@@ -148,6 +149,7 @@ export default function FlightMap({
   trail,
   routes,
   aircraft,
+  aircrafts,
   height = "300px",
   interactive = true,
   zoomControlPosition = "topleft",
@@ -265,6 +267,7 @@ export default function FlightMap({
 
         {/* Aircraft marker */}
         {aircraft && <AircraftMarker lat={aircraft.lat} lon={aircraft.lon} heading={aircraft.heading} />}
+        {aircrafts?.map((item) => <AircraftMarker key={item.id} lat={item.lat} lon={item.lon} heading={item.heading} label={item.label} />)}
       </MapContainer>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSim } from "@/contexts/SimContext";
 import { useUnits } from "@/contexts/UnitsContext";
@@ -12,6 +12,7 @@ import {
   Fuel,
   Route,
   Star,
+  Map as MapIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -25,11 +26,12 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import type { Flight, Transaction, Reputation, GameEvent } from "@/lib/database.types";
+import type { Aircraft, Flight, FlightSchedule, Transaction, Reputation, GameEvent, ScheduleLeg } from "@/lib/database.types";
 import { fetchActiveEvents } from "@/lib/gameEvents";
 import { gradeToScore } from "@/lib/landingGrade";
 import FlightMap, { type RouteArc } from "@/components/FlightMap";
 import { airportByIcao } from "@/data/airports";
+import { advancePassiveOperations } from "@/lib/passiveOperations";
 
 const currency = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -42,6 +44,9 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reputations, setReputations] = useState<Reputation[]>([]);
   const [activeEvents, setActiveEvents] = useState<GameEvent[]>([]);
+  const [passiveLegs, setPassiveLegs] = useState<ScheduleLeg[]>([]);
+  const [passiveSchedules, setPassiveSchedules] = useState<FlightSchedule[]>([]);
+  const [fleet, setFleet] = useState<Aircraft[]>([]);
 
   useEffect(() => {
     if (!company) return;
@@ -73,6 +78,41 @@ export default function Dashboard() {
     fetchActiveEvents(company.id).then((events) => setActiveEvents(events as GameEvent[]));
   }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!company) return;
+    const loadPassiveFlights = async () => {
+      await advancePassiveOperations().catch(() => undefined);
+      const [legsResult, schedulesResult, aircraftResult] = await Promise.all([
+        supabase.from("schedule_legs").select("*").eq("status", "flying").eq("operation_mode", "passive"),
+        supabase.from("schedules").select("*").eq("company_id", company.id).eq("status", "active").eq("passive_enabled", true),
+        supabase.from("aircraft").select("*").eq("company_id", company.id).is("disposed_at", null),
+      ]);
+      setPassiveLegs((legsResult.data as ScheduleLeg[]) ?? []);
+      setPassiveSchedules((schedulesResult.data as FlightSchedule[]) ?? []);
+      setFleet((aircraftResult.data as Aircraft[]) ?? []);
+    };
+    void loadPassiveFlights();
+    const timer = window.setInterval(() => void loadPassiveFlights(), 15_000);
+    return () => window.clearInterval(timer);
+  }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const passiveAircraft = useMemo(() => passiveLegs.flatMap((leg) => {
+    const schedule = passiveSchedules.find((item) => item.id === leg.schedule_id);
+    if (!schedule) return [];
+    const plane = fleet.find((item) => item.id === schedule.aircraft_id);
+    const origin = airportByIcao[leg.origin_icao];
+    const destination = airportByIcao[leg.dest_icao];
+    if (!plane || !origin || !destination || !leg.scheduled_departure_at || !leg.scheduled_arrival_at) return [];
+    const departure = new Date(leg.scheduled_departure_at).getTime();
+    const arrival = new Date(leg.scheduled_arrival_at).getTime();
+    const progress = Math.max(0, Math.min(1, (Date.now() - departure) / Math.max(1, arrival - departure)));
+    const dLon = (destination.lon - origin.lon) * Math.PI / 180;
+    const lat1 = origin.lat * Math.PI / 180;
+    const lat2 = destination.lat * Math.PI / 180;
+    const heading = (Math.atan2(Math.sin(dLon) * Math.cos(lat2), Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)) * 180 / Math.PI + 360) % 360;
+    return [{ id: leg.id, lat: origin.lat + (destination.lat - origin.lat) * progress, lon: origin.lon + (destination.lon - origin.lon) * progress, heading, label: `${plane.registration ?? plane.name} · ${leg.flight_number} · ${leg.origin_icao}→${leg.dest_icao}` }];
+  }), [fleet, passiveLegs, passiveSchedules]);
+
   if (loading) return <Placeholder label="Loading company…" />;
   if (!company) return <Placeholder label="No company — complete onboarding." />;
 
@@ -102,6 +142,29 @@ export default function Dashboard() {
     { name: "Expenses", value: totalExpenses, fill: "oklch(0.64 0.22 340)" },
     { name: "Profit", value: totalRevenue - totalExpenses, fill: totalRevenue - totalExpenses >= 0 ? "#34d399" : "#f87171" },
   ];
+
+  const networkRoutes = recentFlights.reduce<RouteArc[]>((acc, f) => {
+    const dep = airportByIcao[f.departure_icao];
+    const arr = airportByIcao[f.arrival_icao];
+    if (dep && arr) {
+      const key = `${f.departure_icao}-${f.arrival_icao}`;
+      const reverseKey = `${f.arrival_icao}-${f.departure_icao}`;
+      if (!acc.some((r) => `${r.fromIcao}-${r.toIcao}` === key || `${r.fromIcao}-${r.toIcao}` === reverseKey)) {
+        acc.push({ from: [dep.lat, dep.lon], to: [arr.lat, arr.lon], fromIcao: f.departure_icao, toIcao: f.arrival_icao });
+      }
+    }
+    return acc;
+  }, []).concat(passiveLegs.flatMap((leg) => {
+    const origin = airportByIcao[leg.origin_icao];
+    const destination = airportByIcao[leg.dest_icao];
+    return origin && destination ? [{
+      from: [origin.lat, origin.lon] as [number, number],
+      to: [destination.lat, destination.lon] as [number, number],
+      fromIcao: leg.origin_icao,
+      toIcao: leg.dest_icao,
+    }] : [];
+  }));
+  const activeAircraftCount = passiveAircraft.length + (latest && !latest.onGround ? 1 : 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -140,43 +203,43 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          label="Capital"
-          value={currency(company.capital)}
-          icon={DollarSign}
-          iconColor="text-brand-300"
-          glow
-        />
-        <KpiCard
-          label="Sim Status"
-          value={simActive ? "Connected" : "Offline"}
-          icon={Wifi}
-          iconColor={simActive ? "text-emerald-400" : "text-slate-500"}
-        />
-        <KpiCard
-          label="Total Revenue"
-          value={currency(totalRevenue)}
-          icon={TrendingUp}
-          iconColor="text-emerald-400"
-          sub={`${totalFlights} flights`}
-        />
-        <KpiCard
-          label="Total Expenses"
-          value={currency(totalExpenses)}
-          icon={TrendingDown}
-          iconColor="text-red-400"
-          sub={`Net: ${currency(totalRevenue - totalExpenses)}`}
-        />
-        <KpiCard
-          label="Global Reputation"
-          value={`${(company.global_reputation ?? 50).toFixed(0)}/100`}
-          icon={Star}
-          iconColor="text-amber-300"
-          sub={(company.global_reputation ?? 50) >= 70 ? "Excellent" : (company.global_reputation ?? 50) >= 40 ? "Average" : "Poor"}
-        />
-      </div>
+      {/* The map is the primary operational surface of the dashboard. */}
+      <section className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-2 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500/10 text-brand-300">
+                <MapIcon className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-white">Operations map</h2>
+                <p className="text-[11px] text-slate-500">Live fleet, owned hub and active network</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] text-slate-400">
+              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-brand-400 shadow-[0_0_8px_rgba(0,180,216,0.8)]" />{company.hub_icao} hub</span>
+              <span className="font-mono">{networkRoutes.length} routes</span>
+              <span className="flex items-center gap-1.5 font-mono"><Plane className="h-3.5 w-3.5 text-brand-300" />{activeAircraftCount} airborne</span>
+            </div>
+          </div>
+          <FlightMap
+            origin={company.hub_icao ? airportByIcao[company.hub_icao] : undefined}
+            routes={networkRoutes}
+            aircraft={latest && !latest.onGround ? { lat: latest.latitude, lon: latest.longitude, heading: latest.headingDeg } : undefined}
+            aircrafts={passiveAircraft}
+            height="clamp(440px, 58vh, 650px)"
+            interactive
+          />
+        </div>
+
+        <aside className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-1 xl:grid-rows-5" aria-label="Company overview">
+          <KpiCard label="Capital" value={currency(company.capital)} icon={DollarSign} iconColor="text-brand-300" glow compact />
+          <KpiCard label="Sim Status" value={simActive ? "Connected" : "Offline"} icon={Wifi} iconColor={simActive ? "text-emerald-400" : "text-slate-500"} compact />
+          <KpiCard label="Total Revenue" value={currency(totalRevenue)} icon={TrendingUp} iconColor="text-emerald-400" sub={`${totalFlights} flights`} compact />
+          <KpiCard label="Total Expenses" value={currency(totalExpenses)} icon={TrendingDown} iconColor="text-red-400" sub={`Net: ${currency(totalRevenue - totalExpenses)}`} compact />
+          <KpiCard label="Global Reputation" value={`${(company.global_reputation ?? 50).toFixed(0)}/100`} icon={Star} iconColor="text-amber-300" sub={(company.global_reputation ?? 50) >= 70 ? "Excellent" : (company.global_reputation ?? 50) >= 40 ? "Average" : "Poor"} compact />
+        </aside>
+      </section>
 
       {/* Flight in progress */}
       {lastTakeoff && !lastLanding && (
@@ -195,36 +258,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* Flight Network Map — shows all flown routes as arcs */}
-      <FlightMap
-        origin={company.hub_icao ? airportByIcao[company.hub_icao] : undefined}
-        routes={recentFlights.reduce<RouteArc[]>((acc, f) => {
-          const dep = airportByIcao[f.departure_icao];
-          const arr = airportByIcao[f.arrival_icao];
-          if (dep && arr) {
-            // Deduplicate: only add if this route pair isn't already in the list
-            const key = `${f.departure_icao}-${f.arrival_icao}`;
-            const reverseKey = `${f.arrival_icao}-${f.departure_icao}`;
-            if (!acc.some((r) => `${r.fromIcao}-${r.toIcao}` === key || `${r.fromIcao}-${r.toIcao}` === reverseKey)) {
-              acc.push({
-                from: [dep.lat, dep.lon],
-                to: [arr.lat, arr.lon],
-                fromIcao: f.departure_icao,
-                toIcao: f.arrival_icao,
-              });
-            }
-          }
-          return acc;
-        }, [])}
-        aircraft={
-          latest && !latest.onGround
-            ? { lat: latest.latitude, lon: latest.longitude, heading: latest.headingDeg }
-            : undefined
-        }
-        height="300px"
-        interactive
-      />
 
       {/* Last landing */}
       {lastLanding && (
@@ -458,6 +491,7 @@ function KpiCard({
   iconColor = "text-brand-300",
   glow,
   sub,
+  compact = false,
 }: {
   label: string;
   value: string;
@@ -465,18 +499,19 @@ function KpiCard({
   iconColor?: string;
   glow?: boolean;
   sub?: string;
+  compact?: boolean;
 }) {
   return (
     <div
-      className={`rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 transition-all hover:bg-white/[0.04] ${glow ? "glow-brand-sm" : ""}`}
+      className={`rounded-xl border border-white/[0.06] bg-white/[0.02] transition-all hover:border-white/[0.1] hover:bg-white/[0.04] ${compact ? "flex min-h-24 flex-col justify-center px-4 py-3" : "px-5 py-4"} ${glow ? "glow-brand-sm" : ""}`}
     >
-      <div className="mb-3 flex items-center justify-between">
+      <div className={`${compact ? "mb-1.5" : "mb-3"} flex items-center justify-between`}>
         <span className="text-[10px] uppercase tracking-[0.15em] text-slate-500">{label}</span>
-        <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] ${iconColor}`}>
-          <Icon className="h-4 w-4" />
+        <div className={`flex items-center justify-center rounded-lg bg-white/[0.04] ${compact ? "h-7 w-7" : "h-8 w-8"} ${iconColor}`}>
+          <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
         </div>
       </div>
-      <div className="text-2xl font-bold text-white">{value}</div>
+      <div className={`${compact ? "text-xl" : "text-2xl"} font-bold text-white`}>{value}</div>
       {sub && <div className="mt-1 text-xs text-slate-500">{sub}</div>}
     </div>
   );

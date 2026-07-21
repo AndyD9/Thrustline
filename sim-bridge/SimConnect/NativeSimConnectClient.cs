@@ -123,8 +123,12 @@ public class NativeSimConnectClient : ISimClient
                 double groundSpeed = 0, ias = 0, heading = 0;
                 double vs = 0, fuel = 0, onGround = 0;
                 double flaps = 0, gear = 0, parkBrake = 0, spoilers = 0, groundTrack = 0;
+                double accelX = 0, accelY = 0, accelZ = 0, gForce = 1;
+                double pitch = 0, bank = 0, rotationX = 0, rotationY = 0, rotationZ = 0;
+                double seatbelts = 0;
                 double simDisabled = 1; // 1 = menus, 0 = in-flight
-                string? title = null;
+                string? title = null, atcModel = null, atcType = null, registration = null, category = null;
+                var lastMotionSnapshot = DateTimeOffset.MinValue;
 
                 void EmitSnapshot()
                 {
@@ -141,14 +145,36 @@ public class NativeSimConnectClient : ISimClient
                         FuelTotalGal = fuel,
                         OnGround = onGround != 0,
                         AircraftTitle = title,
+                        AircraftAtcModel = atcModel,
+                        AircraftAtcType = atcType,
+                        AircraftRegistration = registration,
+                        AircraftCategory = category,
                         FlapsAnglePct = flaps,
                         GearPosition = gear,
                         ParkingBrake = parkBrake != 0,
                         SpoilersPct = spoilers,
                         GroundTrackDeg = groundTrack,
+                        AccelerationBodyX = accelX,
+                        AccelerationBodyY = accelY,
+                        AccelerationBodyZ = accelZ,
+                        GForce = gForce,
+                        PitchDeg = pitch,
+                        BankDeg = bank,
+                        RotationVelocityBodyX = rotationX,
+                        RotationVelocityBodyY = rotationY,
+                        RotationVelocityBodyZ = rotationZ,
+                        SeatbeltsOn = seatbelts != 0,
                     };
                     Latest = simData;
                     DataReceived?.Invoke(this, simData);
+                }
+
+                void EmitMotionSnapshot()
+                {
+                    var now = DateTimeOffset.UtcNow;
+                    if (now - lastMotionSnapshot < TimeSpan.FromMilliseconds(100)) return;
+                    lastMotionSnapshot = now;
+                    EmitSnapshot();
                 }
 
                 // Numeric SimVars — each subscription updates its field and the
@@ -167,6 +193,18 @@ public class NativeSimConnectClient : ISimClient
                 subs.Add(client.SimVars.Subscribe<double>("BRAKE PARKING INDICATOR", "bool", SimConnectPeriod.Second, v => parkBrake = v));
                 subs.Add(client.SimVars.Subscribe<double>("SPOILERS HANDLE POSITION", "percent", SimConnectPeriod.Second, v => spoilers = v));
                 subs.Add(client.SimVars.Subscribe<double>("GPS GROUND TRUE TRACK", "degrees", SimConnectPeriod.Second, v => groundTrack = v));
+                // Motion data drives the passenger simulation. VisualFrame is
+                // throttled to 10 Hz by EmitMotionSnapshot to keep SignalR lean.
+                subs.Add(client.SimVars.Subscribe<double>("ACCELERATION BODY X", "feet per second squared", SimConnectPeriod.VisualFrame, v => accelX = v));
+                subs.Add(client.SimVars.Subscribe<double>("ACCELERATION BODY Y", "feet per second squared", SimConnectPeriod.VisualFrame, v => accelY = v));
+                subs.Add(client.SimVars.Subscribe<double>("ACCELERATION BODY Z", "feet per second squared", SimConnectPeriod.VisualFrame, v => { accelZ = v; EmitMotionSnapshot(); }));
+                subs.Add(client.SimVars.Subscribe<double>("G FORCE", "GForce", SimConnectPeriod.VisualFrame, v => gForce = v));
+                subs.Add(client.SimVars.Subscribe<double>("PLANE PITCH DEGREES", "degrees", SimConnectPeriod.VisualFrame, v => pitch = v));
+                subs.Add(client.SimVars.Subscribe<double>("PLANE BANK DEGREES", "degrees", SimConnectPeriod.VisualFrame, v => bank = v));
+                subs.Add(client.SimVars.Subscribe<double>("ROTATION VELOCITY BODY X", "radians per second", SimConnectPeriod.VisualFrame, v => rotationX = v));
+                subs.Add(client.SimVars.Subscribe<double>("ROTATION VELOCITY BODY Y", "radians per second", SimConnectPeriod.VisualFrame, v => rotationY = v));
+                subs.Add(client.SimVars.Subscribe<double>("ROTATION VELOCITY BODY Z", "radians per second", SimConnectPeriod.VisualFrame, v => rotationZ = v));
+                subs.Add(client.SimVars.Subscribe<double>("CABIN SEATBELTS ALERT SWITCH", "bool", SimConnectPeriod.Second, v => seatbelts = v));
                 subs.Add(client.SimVars.Subscribe<double>("SIM DISABLED", "bool", SimConnectPeriod.Second, v =>
                 {
                     simDisabled = v;
@@ -182,7 +220,11 @@ public class NativeSimConnectClient : ISimClient
                 {
                     try
                     {
-                        title = (await client.SimVars.GetAsync<string>("TITLE", "string"))?.Trim('\0');
+                        title = (await client.SimVars.GetAsync<string>("TITLE", "string"))?.Trim('\0', ' ');
+                        atcModel = (await client.SimVars.GetAsync<string>("ATC MODEL", "string"))?.Trim('\0', ' ');
+                        atcType = (await client.SimVars.GetAsync<string>("ATC TYPE", "string"))?.Trim('\0', ' ');
+                        registration = (await client.SimVars.GetAsync<string>("ATC ID", "string"))?.Trim('\0', ' ');
+                        category = (await client.SimVars.GetAsync<string>("CATEGORY", "string"))?.Trim('\0', ' ');
                     }
                     catch { /* ignore — title stays at last known value */ }
                 }, null, 0, 5000);

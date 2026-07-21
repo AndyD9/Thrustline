@@ -12,6 +12,9 @@ export interface ScheduleGeneratorInput {
   maxLegMinutes: number;
   returnToHub: boolean;
   airlineCode: string;
+  startAt: Date;
+  groundMinutes: number;
+  timeScale: number;
   seed?: number;
 }
 
@@ -23,6 +26,8 @@ export interface GeneratedScheduleLeg {
   distanceNm: number;
   estimatedMinutes: number;
   flightNumber: string;
+  scheduledDeparture: string;
+  scheduledArrival: string;
 }
 
 export interface GeneratedScheduleRotation {
@@ -83,6 +88,7 @@ export function generateSchedule(input: ScheduleGeneratorInput): GeneratedSchedu
   let totalMinutes = 0;
   let totalDistanceNm = 0;
   let sequence = 1;
+  let nextDeparture = new Date(input.startAt);
 
   for (let rotationIndex = 0; rotationIndex < rotationSizes.length; rotationIndex += 1) {
     const rotationStart = current.icao;
@@ -148,7 +154,10 @@ export function generateSchedule(input: ScheduleGeneratorInput): GeneratedSchedu
         distanceNm,
         estimatedMinutes,
         flightNumber: `${input.airlineCode}${String(sequence).padStart(3, "0")}`,
+        scheduledDeparture: nextDeparture.toISOString(),
+        scheduledArrival: new Date(nextDeparture.getTime() + estimatedMinutes / input.timeScale * 60_000).toISOString(),
       });
+      nextDeparture = new Date(nextDeparture.getTime() + (estimatedMinutes + input.groundMinutes) / input.timeScale * 60_000);
       totalMinutes += estimatedMinutes;
       totalDistanceNm += distanceNm;
       recentDestinations.push(destination.icao);

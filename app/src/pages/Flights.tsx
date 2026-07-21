@@ -84,6 +84,7 @@ export default function Flights() {
                   <span>{Number(f.distance_nm).toFixed(0)} nm</span>
                   <span>{f.duration_min} min</span>
                   <span>{Number(f.fuel_used_gal).toFixed(0)} gal</span>
+                  {(f.pax_eco + f.pax_biz) > 0 && <span className="flex items-center gap-1 text-slate-400"><Users className="h-3 w-3" />{f.pax_eco}Y + {f.pax_biz}J · {Math.round(Number(f.load_factor_pct ?? 0))}%</span>}
                 </div>
 
                 {/* Grade badge */}
@@ -120,6 +121,7 @@ export default function Flights() {
                   >
                     {Number(f.net_result) >= 0 ? "+" : ""}{currency(Number(f.net_result))}
                   </div>
+                  {f.operation_mode === "passive" && <div className="mt-1 text-[10px] text-slate-600">Fuel {currency(Number(f.fuel_cost))} · Fees {currency(Number(f.landing_fee))} · Maint. {currency(Number(f.maintenance_cost))}</div>}
                 </div>
                 <div className="min-w-[120px] text-right text-[11px] text-slate-600">
                   {new Date(f.completed_at).toLocaleString()}
