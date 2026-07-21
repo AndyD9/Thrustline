@@ -103,7 +103,7 @@ app.Use(async (context, next) =>
 app.MapGet("/health", (ISimClient sim, ISessionStore session) => Results.Ok(new
 {
     status = "ok",
-    version = "0.1.0",
+    version = "0.2.0",
     simConnect = sim is NativeSimConnectClient ? "native" : "idle",
     simConnected = sim.IsConnected,
     simError = sim.LastError,

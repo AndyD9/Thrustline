@@ -3707,7 +3707,7 @@ dependencies = [
 
 [[package]]
 name = "thrustline"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "discord-rich-presence",
  "rand 0.8.5",

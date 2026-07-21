@@ -1,6 +1,6 @@
 [package]
 name = "thrustline"
-version = "0.1.0"
+version = "0.2.0"
 description = "Thrustline — virtual airline companion for MSFS 2024"
 authors = ["Thrustline"]
 edition = "2021"
