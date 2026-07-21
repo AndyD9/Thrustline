@@ -1,186 +1,162 @@
 # Thrustline
 
-Desktop companion app for **Microsoft Flight Simulator 2024** — build and manage your own virtual airline from the ground up.
+Thrustline est une application de gestion de compagnie aerienne virtuelle pour Microsoft Flight Simulator. Elle combine gestion de flotte, planification des vols, operations passives, economie et suivi en temps reel du simulateur dans une application de bureau Windows.
 
-Thrustline connects directly to MSFS 2024 via SimConnect to track your flights in real time, then layers on a full airline management simulation: fleet acquisition, crew hiring, route economics, dynamic events, and cloud-synced progression.
+> Le projet est en developpement actif. Il n'existe pas encore de version publique stable.
 
----
+## Fonctionnalites
 
-## Table of Contents
+- Creation et gestion d'une compagnie aerienne
+- Tableau de bord avec indicateurs, historique et carte du reseau
+- Achat, vente, location et maintenance des avions
+- Marche d'avions neufs et d'occasion
+- Creation de dispatches et integration SimBrief
+- Suivi de vol en temps reel via SimConnect
+- Planification de rotations et operations passives accelerees
+- Gestion des equipages, finances, emprunts et transactions
+- Simulation de l'experience passager et bilan d'atterrissage
+- Synchronisation des donnees et authentification avec Supabase
 
-- [Features](#features)
-  - [Real-Time Flight Tracking](#real-time-flight-tracking)
-  - [Fleet Management](#fleet-management)
-  - [Crew Management](#crew-management)
-  - [Route Discovery & Reputation](#route-discovery--reputation)
-  - [Dispatch & SimBrief Integration](#dispatch--simbrief-integration)
-  - [Financial Engine](#financial-engine)
-  - [Dynamic Game Events](#dynamic-game-events)
-  - [Live Map & Dashboard](#live-map--dashboard)
-  - [Authentication & Cloud Sync](#authentication--cloud-sync)
-  - [Data Export](#data-export)
-- [Tech Stack](#tech-stack)
-- [Roadmap](#roadmap)
-- [License](#license)
+## Architecture
 
----
+```text
+Microsoft Flight Simulator
+          |
+          v
+sim-bridge (.NET 8 / SimConnect)
+          |
+     REST + SignalR
+          |
+          v
+app (Tauri v2 / React / TypeScript)
+          |
+          v
+Supabase (Auth / PostgreSQL / Realtime)
+```
 
-## Features
+Le depot contient les composants suivants :
 
-### Real-Time Flight Tracking
+| Dossier | Description |
+| --- | --- |
+| `app/` | Application de bureau Tauri v2 et interface React |
+| `sim-bridge/` | Sidecar ASP.NET Core reliant l'application a MSFS via SimConnect |
+| `supabase/` | Configuration et migrations PostgreSQL |
+| `scripts/` | Scripts PowerShell de build et d'integration |
+| `legacy/` | Anciennes implementations Electron et WPF, conservees comme reference |
 
-Thrustline hooks into MSFS 2024 through the SimConnect SDK to capture live telemetry data every second:
+## Prerequis
 
-- **Telemetry captured:** latitude, longitude, altitude, ground speed, vertical speed, heading, ground track, fuel quantity, on-ground state, aircraft ICAO type
-- **Automatic takeoff/landing detection** using a state machine with 5-second debounce to filter out sim jitter
-- **Departure/arrival ICAO resolution** via nearest-airport lookup at the moment of takeoff and landing
-- **Haversine distance calculation** between departure and arrival
-- **Landing quality tracking** — vertical speed at touchdown (fpm) recorded for every flight
-- **Mock flight mode** on macOS/Linux — simulates a CDG-to-JFK cycle (~60s) for development and testing without MSFS
+- Windows 10 ou 11
+- Microsoft Flight Simulator avec SimConnect
+- [Node.js 24.18 LTS](https://nodejs.org/) et npm
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Rust](https://www.rust-lang.org/tools/install)
+- Les [prerequis Tauri v2 pour Windows](https://v2.tauri.app/start/prerequisites/)
+- Un projet [Supabase](https://supabase.com/)
 
-### Fleet Management
+## Installation
 
-Build your airline's fleet by leasing or purchasing aircraft from a catalog of 20+ types spanning regional, narrowbody, and widebody categories.
+### 1. Cloner le depot
 
-- **Lease or buy:** leased aircraft have a monthly cost with no ownership; purchased aircraft are yours to keep or sell
-- **Aircraft health system:** every aircraft tracks a health percentage (0–100%)
-  - Health degrades by 0.1% per flight hour
-  - Hard landings (vertical speed worse than -600 fpm) apply additional damage
-  - Health below 80% triggers light maintenance ($5,000)
-  - Health below 50% triggers heavy maintenance ($40,000) and grounds the aircraft
-- **Auto-detection:** Thrustline reads your in-sim aircraft ICAO type and automatically selects the matching fleet aircraft
-- **Resale:** sell owned aircraft at a depreciated value based on flight hours and cycles
-- **Status badges:** Airworthy (>=80%), Degraded (50–79%), Grounded (<50%)
+```powershell
+git clone https://github.com/AndyD9/Thrustline.git
+Set-Location Thrustline
+```
 
-### Crew Management
+### 2. Configurer le frontend
 
-Hire and manage pilots to staff your fleet.
+```powershell
+Set-Location app
+Copy-Item .env.example .env
+npm install
+```
 
-- **Hiring pool:** randomly generated candidates with varying rank (Captain / First Officer), experience (1–10), and salary
-- **Aircraft assignment:** assign crew members to specific aircraft in your fleet
-- **Duty hour tracking:** each crew member logs flight hours per month against an 80-hour cap, with visual progress bars and warnings when approaching the limit
-- **Status tracking:** available, flying, or resting
-- **Monthly payroll:** salaries are automatically deducted from your capital on a recurring basis
+Renseignez ensuite les variables suivantes dans `app/.env` :
 
-### Route Discovery & Reputation
+```dotenv
+VITE_SUPABASE_URL=https://votre-projet.supabase.co
+VITE_SUPABASE_ANON_KEY=votre-cle-anon
+```
 
-Every flight you complete automatically discovers and logs the route.
+La cle anonyme est utilisee avec les politiques RLS. La cle `service_role` reste exclusivement dans les secrets des Edge Functions Supabase et n'est jamais installee sur un poste utilisateur.
 
-- **Discovered routes view:** aggregated statistics per origin-destination pair — flight count, total and average revenue, distance, average landing quality
-- **Reputation score** (0–100) per route, starting at a neutral 50
-  - Smooth landings, high load factors, and healthy aircraft improve reputation
-  - Poor performance degrades it
-  - Reputation directly affects passenger demand (load factor modifier from 0.85x to 1.15x)
-- **Saved routes:** bookmark your most profitable routes for quick reference
-- **Sorting and filtering:** by revenue, net profit, flight count, distance, or reputation
+### 3. Configurer le backend securise
 
-### Dispatch & SimBrief Integration
+Appliquez les migrations puis deployez `supabase/functions/complete-flight`. Le sim-bridge recoit la configuration publique et le JWT depuis l'application authentifiee; aucun secret backend ne lui est fourni. Voir `supabase/SECURITY_DEPLOYMENT.md`.
 
-Plan your flights with a built-in dispatch system that integrates with SimBrief.
+### 4. Initialiser la base de donnees
 
-- **Create dispatches:** select origin, destination, aircraft type, and passenger/cargo configuration
-- **SimBrief link:** one-click opens SimBrief pre-filled with your flight parameters (origin, destination, aircraft, pax count, cargo)
-- **OFP fetch:** after planning in SimBrief, fetch the generated Operational Flight Plan back into Thrustline — fuel plan, route, block time, cruise altitude
-- **Status workflow:** pending -> dispatched (SimBrief opened) -> flying (takeoff detected) -> completed (landing processed)
-- **Auto-linking:** when you land, Thrustline automatically matches the flight to your pending dispatch and closes it out
+Appliquez dans l'ordre les migrations du dossier `supabase/migrations/` a votre projet Supabase. Elles definissent le schema, les contraintes, les fonctions, les politiques RLS et les donnees necessaires a l'application.
 
-### Financial Engine
+### 5. Construire le sidecar Windows
 
-A complete economic simulation tracks every dollar flowing through your airline.
+Depuis la racine du depot :
 
-**Revenue:**
-- Flight ticket revenue calculated per flight using a yield model:
-  - Base rate: $0.12/nm (economy), $0.35/nm (business)
-  - Load factor: randomized 60–95%, modified by route reputation
-  - Event bonuses: tourism booms and other demand events add multipliers
+```powershell
+.\scripts\build-sidecar.ps1
+```
 
-**Expenses:**
-- **Fuel costs:** ~$3.20/gal, modified by global fuel events (spikes or drops)
-- **Landing fees:** variable by airport
-- **Aircraft leases:** monthly recurring
-- **Crew salaries:** monthly recurring
-- **Maintenance:** light ($5K) or heavy ($40K) triggered by aircraft health
-- **Loan payments:** monthly installments with interest
+Le script publie le sim-bridge puis copie les fichiers requis dans le dossier des binaires externes de Tauri.
 
-**Tracking:**
-- Full transaction ledger with 10 categories: revenue, fuel, landing_fee, lease, maintenance, salary, purchase, sale, loan_payment
-- Capital-over-time line chart
-- Revenue/cost breakdown bar chart
-- Filtering by transaction type and date range
+## Developpement
 
-### Dynamic Game Events
+### Interface web uniquement
 
-Random events keep your airline on its toes.
+```powershell
+Set-Location app
+npm run dev
+```
 
-| Event | Scope | Effect | Duration |
-|-------|-------|--------|----------|
-| Fuel Price Surge | Global | Fuel costs x1.30 | 12–48h |
-| Fuel Prices Drop | Global | Fuel costs x0.75 | 12–36h |
-| Severe Weather | Route | Route blocked (modifier=0) | 4–12h |
-| Tourism Boom | Route | Demand increase (modifier=1.20) | 24–72h |
-| Airport Strike | Route | Route blocked (modifier=0) | 6–24h |
-| Mechanical Issue | Aircraft | Aircraft grounded (modifier=0) | 6–24h |
+### Application de bureau complete
 
-- **15% trigger chance** per 60-second tick, max 3 concurrent events per company
-- Desktop notifications when events start and expire
-- Events display on the dashboard with countdown timers
+```powershell
+Set-Location app
+npm run tauri:dev
+```
 
-### Live Map & Dashboard
+### Sim-bridge seul
 
-- **MapLibre GL live map:** real-time aircraft position, flight trail breadcrumbs (every 30s), active dispatch route line, all discovered routes overlay
-- **Dashboard KPIs:** capital, total flights, hard landings, net profit/loss, total revenue
-- **Charts:** revenue breakdown bar chart, capital-over-time line chart
-- **Live flight bar:** current flight status (departure, destination, altitude, speed, duration)
-- **SimConnect status indicator:** connected/disconnected/mock mode
+```powershell
+Set-Location sim-bridge
+dotnet run
+```
 
-### Authentication & Cloud Sync
+Le bridge ecoute par defaut sur `http://127.0.0.1:5055` et expose des endpoints REST locaux ainsi qu'un hub SignalR.
 
-- **Multi-provider auth:** email/password, Discord OAuth, Google OAuth — all via Supabase
-- **Deep linking:** OAuth callbacks handled via `thrustline://auth/callback` protocol
-- **Multi-tenant isolation:** all data scoped to `userId` — your airline is yours alone
-- **Bi-directional cloud sync:**
-  - Pull from Supabase on startup
-  - Push changes every 5 seconds via SyncLog tracking (create/update/delete)
-  - Batch upsert (50 records per call) for efficiency
-  - Offline detection with automatic resume
-  - Sync status indicator in the UI (syncing, idle, error, offline)
+## Validation
 
-### Data Export
+```powershell
+# Tests et build du frontend
+Set-Location app
+npm test
+npm run build
 
-- **Flight log CSV export:** date, departure, arrival, aircraft, distance, duration, fuel, vertical speed, revenue, costs, net result
-- **Transaction CSV export:** date, type, description, amount
-- Exports via native system file picker dialog
+# Build du sim-bridge
+Set-Location ..\sim-bridge
+dotnet build
+```
 
----
+Un build Tauri complet peut etre lance avec :
 
-## Tech Stack
+```powershell
+Set-Location app
+npm run tauri:build
+```
 
-| Layer | Technology |
-|-------|-----------|
-| Desktop | Electron 41 |
-| Frontend | React 19, TypeScript 6, Tailwind CSS 4 |
-| Bundler | Vite 6 with vite-plugin-electron |
-| Maps | MapLibre GL + React Map GL |
-| Backend | Fastify 5 (embedded, localhost:3000) |
-| ORM | Prisma 6 with SQLite |
-| Cloud | Supabase (PostgreSQL + Auth) |
-| Validation | Zod 4 |
-| Sim Integration | node-simconnect (Windows) / mock (macOS/Linux) |
-| Packaging | electron-builder (NSIS / DMG / AppImage) |
+## Documentation du projet
 
----
+- [`PLAN.md`](PLAN.md) : feuille de route et comportement cible
+- [`PROGRESS.md`](PROGRESS.md) : etat d'avancement et fonctionnalites livrees
+- [`codex.md`](codex.md) : architecture detaillee et conventions de contribution
+- [`supabase/README.md`](supabase/README.md) : notes relatives a Supabase
 
-## Roadmap
+## Securite
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1–5 | Core simulation, fleet, crew, routes, dispatch, events, finances | Done |
-| 6a | Authentication + cloud sync | Done |
-| 6b | Virtual Airlines (multiplayer alliances) | Planned |
-| 7 | Freemium model (Stripe integration) | Planned |
+- Ne commitez jamais de fichier `.env`, de cle `service_role` ou de secret utilisateur.
+- Le frontend utilise uniquement la cle anonyme Supabase avec RLS.
+- Le sim-bridge reste lie a l'interface locale et conserve les acces privilegies cote serveur.
+- Les binaires generes, dependances et sorties de build ne doivent pas etre ajoutes au depot.
 
----
+## Licence
 
-## License
-
-All rights reserved.
+Aucune licence open source n'est actuellement declaree. Tous droits reserves.

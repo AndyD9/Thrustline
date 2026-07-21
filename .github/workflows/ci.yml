@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [rework]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend tests and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Smoke-test the Vite development server
+        shell: bash
+        run: |
+          npm run dev -- --host 127.0.0.1 > "$RUNNER_TEMP/vite.log" 2>&1 &
+          vite_pid=$!
+          trap 'kill "$vite_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:1420/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/vite.log"
+          exit 1
+
+  windows:
+    name: Windows bridge and Tauri
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+      - name: Build frontend
+        working-directory: app
+        run: npm run build
+      - name: Build bridge
+        working-directory: sim-bridge
+        run: dotnet build --configuration Release
+      - name: Build Windows sidecar
+        shell: pwsh
+        run: ./scripts/build-sidecar.ps1
+      - name: Check Tauri shell
+        working-directory: app/src-tauri
+        run: cargo check
+      - name: Build Tauri executable
+        working-directory: app
+        run: npm run tauri:build -- --no-bundle

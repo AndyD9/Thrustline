@@ -1,0 +1,110 @@
+<Window x:Class="Thrustline.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Thrustline.ViewModels"
+        Title="Thrustline" Height="800" Width="1280"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}">
+
+    <Grid Background="{StaticResource PageBackgroundGradient}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ── Frosted Glass Sidebar ──────────────────────────────────── -->
+        <Border Grid.Column="0" Background="{StaticResource SidebarGradient}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+
+            <!-- Subtle glass overlay -->
+            <Border Background="{StaticResource GlassBrush}">
+                <DockPanel>
+
+                    <!-- Logo -->
+                    <StackPanel DockPanel.Dock="Top" Margin="24,28,24,32">
+                        <TextBlock FontSize="24" FontWeight="Bold">
+                            <Run Text="Thrust" Foreground="{StaticResource AccentBrush}" />
+                            <Run Text="line" Foreground="{StaticResource TextPrimaryBrush}" />
+                        </TextBlock>
+                        <TextBlock Text="Virtual Airline" Foreground="{StaticResource TextDimBrush}"
+                                   FontSize="11" Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <!-- Status indicators at bottom -->
+                    <Border DockPanel.Dock="Bottom" Margin="16,0,16,20"
+                            Background="{StaticResource GlassBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1" CornerRadius="10" Padding="14,12">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <Ellipse Width="7" Height="7" Margin="0,0,10,0">
+                                    <Ellipse.Style>
+                                        <Style TargetType="Ellipse">
+                                            <Setter Property="Fill" Value="{StaticResource ErrorBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SimStatus}" Value="connected">
+                                                    <Setter Property="Fill" Value="{StaticResource AccentBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SimStatus}" Value="mock">
+                                                    <Setter Property="Fill" Value="{StaticResource WarningBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+                                <TextBlock Text="{Binding SimStatus, StringFormat='SimConnect: {0}'}"
+                                           Foreground="{StaticResource TextDimBrush}" FontSize="11" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="7" Height="7" Fill="{StaticResource InfoBrush}" Margin="0,0,10,0" />
+                                <TextBlock Text="{Binding SyncStatus, StringFormat='Cloud sync: {0}'}"
+                                           Foreground="{StaticResource TextDimBrush}" FontSize="11" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Navigation -->
+                    <StackPanel Margin="10,0">
+                        <Button Content="&#xE80F;  Overview"  Command="{Binding NavigateCommand}" CommandParameter="Dashboard" Margin="0,1" Style="{StaticResource NavButton}" />
+                        <Button Content="&#xE709;  Flights"   Command="{Binding NavigateCommand}" CommandParameter="Flights"   Margin="0,1" Style="{StaticResource NavButton}" />
+                        <Button Content="&#xE8A1;  Finances"  Command="{Binding NavigateCommand}" CommandParameter="Finances"  Margin="0,1" Style="{StaticResource NavButton}" />
+                        <Button Content="&#xEB47;  Fleet"     Command="{Binding NavigateCommand}" CommandParameter="Fleet"     Margin="0,1" Style="{StaticResource NavButton}" />
+                        <Button Content="&#xE716;  Crew"      Command="{Binding NavigateCommand}" CommandParameter="Crew"      Margin="0,1" Style="{StaticResource NavButton}" />
+                        <Button Content="&#xE707;  Routes"    Command="{Binding NavigateCommand}" CommandParameter="Routes"    Margin="0,1" Style="{StaticResource NavButton}" />
+                        <Button Content="&#xE8A7;  Dispatch"  Command="{Binding NavigateCommand}" CommandParameter="Dispatch"  Margin="0,1" Style="{StaticResource NavButton}" />
+                        <Button Content="&#xE713;  Settings"  Command="{Binding NavigateCommand}" CommandParameter="Settings"  Margin="0,1" Style="{StaticResource NavButton}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </Border>
+
+        <!-- ── Content Area ───────────────────────────────────────────── -->
+        <DockPanel Grid.Column="1">
+
+            <!-- Live flight bar (glass strip) -->
+            <Border DockPanel.Dock="Top" Margin="20,16,20,0"
+                    Background="{StaticResource AccentGlowBrush}"
+                    BorderBrush="{StaticResource AccentGlowBrush}"
+                    BorderThickness="1" CornerRadius="10" Padding="18,12"
+                    Visibility="{Binding IsFlying, Converter={StaticResource BoolToVis}}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="0" Opacity="0.15" Color="{StaticResource Emerald}" />
+                </Border.Effect>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="LIVE" FontWeight="Bold" FontSize="10" Foreground="{StaticResource AccentBrush}"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBlock Text="{Binding DepartureIcao}" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="  —  " Foreground="{StaticResource TextDimBrush}" />
+                    <TextBlock Text="{Binding CurrentAircraftType}" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Text="{Binding Altitude, StringFormat='  |  {0:N0} ft'}" Foreground="{StaticResource TextSecondaryBrush}" Margin="16,0,0,0" />
+                    <TextBlock Text="{Binding GroundSpeed, StringFormat='  |  {0:N0} kts'}" Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Page content -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0">
+                <ContentControl Content="{Binding CurrentPage}" Margin="24,20" />
+            </ScrollViewer>
+        </DockPanel>
+    </Grid>
+</Window>

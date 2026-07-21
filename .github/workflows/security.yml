@@ -1,0 +1,59 @@
+name: Security and build
+
+on:
+  pull_request:
+  push:
+    branches: [main, rework, "codex/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+      - name: Frontend tests
+        working-directory: app
+        run: npm test
+      - name: Frontend production build
+        working-directory: app
+        run: npm run build
+      - name: Production dependency audit
+        working-directory: app
+        run: npm audit --omit=dev --audit-level=high
+      - name: Bridge build
+        working-directory: sim-bridge
+        run: dotnet build --configuration Release
+      - name: NuGet vulnerability audit
+        working-directory: sim-bridge
+        run: dotnet list package --vulnerable --include-transitive
+      - name: Tauri check
+        working-directory: app/src-tauri
+        run: cargo check
+      - name: Rust vulnerability audit
+        uses: rustsec/audit-check@v2.0.0
+        with:
+          working-directory: app/src-tauri
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+      - name: Repository security invariants
+        shell: pwsh
+        run: ./scripts/security-check.ps1

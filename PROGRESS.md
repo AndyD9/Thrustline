@@ -1,0 +1,228 @@
+# Thrustline — Etat d'avancement
+
+> Mis a jour a chaque session. Lire en premier avant tout travail.
+> Voir `PLAN.md` pour le plan detaille.
+
+---
+
+## Branche : `rework`
+
+## Phase actuelle : Phase 5 — Game Mechanics + MVP Flight Scheduling livre
+
+---
+
+## Historique des commits
+
+```
+5cadd69 feat(app): flight network map on Dashboard with curved route arcs
+67bf327 feat(app): show flight number and route in LiveFlightBar
+f8ee5c1 fix(app): aircraft icon rotates to match flight heading
+89f9903 fix(app): aircraft follows flight plan route + trail on map
+5597af6 feat(app): pass passenger count to SimBrief dispatch URL
+8f72407 feat(sim-bridge): mock aircraft follows flight plan waypoints
+16beace feat(app): add flight number + callsign to dispatch, pass to SimBrief
+081d200 fix(app): SimBrief opens browser, fix map route color, remove cruise alt
+2d91a65 refactor(app): redesign dispatch form — SimBrief-first workflow
+0919e07 feat(sim-bridge): dispatch-driven mock + UserSecretsId for Supabase config
+634324e feat(app): live flight tracking, unit system, UI fixes
+845fa43 feat(app): Phase 4 — airports, aircraft types, flight map, SimBrief integration
+02986fd docs: rewrite PLAN.md and PROGRESS.md for rework branch
+748b637 fix(sim-bridge): use HAS_SIMCONNECT flag instead of WINDOWS
+12fb831 feat: NativeSimConnect + sidecar auto-spawn + Supabase Realtime
+```
+
+---
+
+## Ce qui est fait
+
+### Phase 1 — Fondations
+
+| Composant | Status | Details |
+|---|---|---|
+| Sim-bridge C# .NET 8 | DONE | ASP.NET Minimal API, SignalR, SimConnect abstraction |
+| MockSimClient | DONE | Dispatch-driven (idle par defaut, vol a la demande via POST /mock/start-flight) |
+| FlightDetector | DONE | Machine a etats takeoff/landing, debounce 5s, haversine |
+| LandingProcessor | DONE | Pipeline complete : yield/cashflow/maintenance → Supabase writes |
+| Services metier | DONE | YieldService, CashflowService, MaintenanceService |
+| Cloud models (DTOs) | DONE | 6 models avec Supabase.Postgrest attributes |
+| Backend privilegie | DONE | Edge Function authentifiee; aucune cle service_role dans le frontend ou le sidecar |
+| Deploiement securite Supabase | DONE | Migrations 20260721190000-20260721201000 appliquees et fonction complete-flight active sur le projet lie |
+| Schema Supabase | DONE | 10 tables, 7 enums, RLS policies, triggers |
+| Frontend Tauri + React | DONE | Tauri v2, React 18, TS, Vite, Tailwind v4 |
+| Auth + Onboarding | DONE | Supabase Auth, CompanyContext, AirportPicker hub |
+| SignalR streaming | DONE | useSimStream hook, LiveFlightBar (flight number + route), SimStatusBadge |
+
+### Phase 2 — Pages UI
+
+| Page | Status | Details |
+|---|---|---|
+| Dashboard | DONE | KPIs, flight network map (arcs courbes), charts, recent flights |
+| Flights | DONE | Table historique (route, distance, duration, fuel, revenue, net) |
+| Fleet | DONE | Cards avions, health bar, AircraftTypePicker, set active |
+| Maintenance flotte | DONE | Devis, confirmation, debit atomique, transaction et remise a 100 %, avec blocage en operation |
+| Marche d'occasion | DONE | Annonces partagees, filtres, etat/heures/prix/localisation, achat atomique avec debit et transaction |
+| Marche avions + credit-bail | DONE | Achat neuf, achat occasion, lease-to-own 12-48 mois, impayes, rachat anticipe et transfert automatique de propriete |
+| Vente + restitution flotte | DONE | Estimation serveur, commission courtier, frais de restitution, blocages operationnels et remplacement de l'avion actif |
+| Profils SimBrief dans le marche | DONE | Chaque profil Settings genere une offre neuve et deux occasions privees, achetables ou finançables |
+| Dispatch | DONE | SimBrief-first workflow, OFP inline, route preview, callsign |
+| Crew | DONE | Table rank/status, aircraft assignment, hire form, random names |
+| Finances | DONE | Summary cards, cashflow chart (recharts), loans, transaction ledger |
+| Settings | DONE | Health check, SimBrief username, unit system toggle |
+| Live Flight | DONE | Carte plein ecran, avion temps reel, trail, instruments, landing recap |
+
+### Phase 3 — Infra technique
+
+| Feature | Status | Details |
+|---|---|---|
+| NativeSimConnectClient | DONE | `#if HAS_SIMCONNECT`, Win32 message pump, 10 SimVars, retry 5s |
+| Verification avion MSFS | DONE | Modele/type/immatriculation SimConnect compares au dispatch et a l'OFP dans Live Flight |
+| Demarrage de vol securise | DONE | Passage en flying autorise uniquement avec MSFS actif et avion detecte au sol |
+| Sidecar auto-spawn | DONE | `build-sidecar.ps1`, lib.rs child management, kill on close |
+| Discord Rich Presence | DONE | Phase ACARS et route du vol publiees dynamiquement par Tauri, reconnexion automatique |
+| Supabase Realtime | DONE | CompanyContext subscribe, capital updates live |
+| useRealtimeTable | DONE | Hook generique INSERT/UPDATE/DELETE |
+| waitForBridge | DONE | Retry helper startup |
+| Durcissement desktop | DONE | JWT valide, appairage ephemere Tauri/bridge, CORS limite, CSP active et permissions shell reduites |
+| Chargement frontend | DONE | Pages metier, cartes, graphiques et base aeroports decoupes en chunks a la demande |
+| UI Polish v2 | DONE | Lucide icons, recharts, glassmorphism v2, animations |
+
+### Phase 4 — Features majeures
+
+| Feature | Status | Details |
+|---|---|---|
+| Airport database | DONE | 3232 aeroports ICAO 4-lettres, OurAirports source |
+| AirportPicker | DONE | Autocomplete ICAO/IATA/nom/ville, keyboard nav |
+| Aircraft types database | DONE | 36 types MSFS (Airbus, Boeing, Regional, Turboprops, GA) |
+| Dispatch refonte | DONE | SimBrief-first: route → avion (specs pills) → load (max pax) → flight ID/callsign → SimBrief → OFP inline → submit |
+| FlightMap | DONE | Dark tiles, bezier route arcs, aircraft marker (heading rotation), trail, waypoints |
+| Dashboard network map | DONE | Arcs courbes historiques, dots aeroports, auto-fit bounds, interactive |
+| Live Flight page | DONE | Carte plein ecran, instruments overlay, trail, landing recap |
+| SimBrief integration | DONE | Generate (airline/fltnum/callsign/pax), Import OFP, inline resume, ofp_data persiste |
+| Unit system | DONE | Imperial/Metric toggle, UnitsContext, integre LiveFlightBar + Dashboard + LiveFlight |
+| Mock dispatch-driven | DONE | Idle par defaut, vol a la demande avec waypoints OFP, heading dynamique |
+| Import airframes SimBrief | DONE | Decodage local des liens partages, economie automatique, catalogue persistant dans Settings |
+
+### Phase 6 — Flight Scheduling (MVP)
+
+| Feature | Status | Details |
+|---|---|---|
+| Schedule generator | DONE | Vols/rotations/heures max/duree max, range avion, retour hub optionnel |
+| No teleport | DONE | Position avion persistante et validation DB au passage en flying |
+| Schedule UI | DONE | Preview carte + rotations, sauvegarde, annulation, prochain vol disponible |
+| Gestion des schedules | DONE | Affectation avion visible dans Schedule/Fleet et suppression securisee avec confirmation |
+| Dispatch integration | DONE | Creation d'un seul dispatch depuis le prochain leg |
+| Landing progression | DONE | LandingProcessor complete le leg, deplace l'avion et debloque le suivant |
+| Supabase schema | DONE | schedules, schedule_rotations, schedule_legs, index et policies RLS |
+| Operations passives | DONE | Horaires, temps au sol, captain/FO et PNC variables selon l'avion, progression automatique, economie/usure et rattrapage hors ligne |
+| Acceleration passive | DONE | Echelle 1x/6x/12x/24x, 12x par defaut, sans reduire heures de vol, usure ni revenus |
+| Visibilite flotte passive | DONE | Prochain leg/equipage dans Fleet et avion interpole sur la carte Schedule |
+| Carte Dashboard passive | DONE | Tous les avions passifs en vol, routes et info-bulles, actualises toutes les 15 secondes |
+| Economie passive par passagers | DONE | Demande deterministe, capacite avion, tarifs Eco/Business, consommation par famille, frais aeroportuaires et maintenance variable |
+
+### Passenger Experience (MVP)
+
+| Feature | Status | Details |
+|---|---|---|
+| Telemetrie cabine | DONE | Accelerations, G-force, pitch/bank, rotations et ceintures via SimConnect, snapshots mouvement limites a 10 Hz |
+| Simulation temps reel | DONE | Cohortes Economy/Business, confort, stress, nausee, divertissement, turbulences et manoeuvres brusques |
+| SignalR + Live Flight | DONE | Etat cabine diffuse a 2 Hz, panneau temps reel et tendances visibles pendant le vol |
+| Bilan et persistence | DONE | Atterrissage integre au score final et `flights.pax_satisfaction` alimente par la simulation, avec fallback historique |
+| Embarquement passagers | DONE | Progression 30-90s persistante, Business prioritaire, compteurs par cabine, passage automatique a ready et verrouillage du depart |
+
+---
+
+## En cours — Phase 5
+
+### 5.1 Evenements aleatoires
+- [ ] `GameEvent` system : fuel_spike, weather, tourism_boom, strike, mechanical
+- [ ] Modificateurs temporaires sur les routes/avions
+- [ ] Notifications in-app
+
+### 5.2 Systeme de loans
+- [ ] Prendre un emprunt pour acheter un avion
+- [ ] Remboursements mensuels automatiques
+- [ ] UI dans Finances
+
+### 5.3 Salaires & charges mensuelles
+- [ ] Deduction automatique salaires crew
+- [ ] Deduction lease cost avions
+- [ ] Timer mensuel (ou par session)
+
+### 5.4 Reputation avancee
+- [ ] Score par route influence la demande pax
+- [ ] Bonus/malus visibles dans l'UI
+- [ ] Deblocage de routes premium
+
+---
+
+## Bugs connus / fixes appliques
+
+| Bug | Cause | Fix | Commit |
+|---|---|---|---|
+| Leaflet z-index chevauche UI | Layers internes z-index 400+ | isolation:isolate + z-index:0 | `634324e` |
+| OFP times raw unix timestamps | sched_out/sched_in pas formates | parseInt + formatUnixUTC() | `634324e` |
+| SimBrief n'ouvre pas le navigateur | window.open() bloque dans Tauri | shell.open() + permission shell:allow-open | `081d200` |
+| Polyline invisible sur carte | oklch() pas supporte par Leaflet | Couleur hex #00b4d8 | `081d200` |
+| Avion en diagonale sur carte | Lerp lineaire origin→dest sans waypoints | InterpolateRoute avec waypoints + Bearing | `8f72407` |
+| Icone avion ne tourne pas | SVG Lucide pointe ~315°, pas 0° | Triangle simple nord=0° + rotate(heading) | `f8ee5c1` |
+| Secret privilegie sur le client | Ancien sidecar configure avec service_role | Remplace par JWT utilisateur + Edge Function serveur | Securite distribution |
+| Mock vol auto en boucle | CDG→JFK 100s loop au demarrage | Dispatch-driven, idle par defaut | `0919e07` |
+| Vol affiche dans les menus MSFS | L'UI conservait le dernier snapshot actif quand `SIM DISABLED=1` | Etat actif propage et detecteur reinitialise | Non commite |
+
+---
+
+## Commandes utiles
+
+```bash
+# Prerequis frontend : Node.js 24.18.0 LTS
+
+# Frontend (dev)
+cd app && npm run dev                    # Vite dev server (port 1420)
+cd app && npm run tauri:dev              # Tauri + Vite (avec sidecar)
+
+# Frontend (validation)
+cd app && npm test
+cd app && npm run build
+
+# Sim-bridge (dev)
+cd sim-bridge && dotnet run              # Lance le service .NET (port 5055)
+
+# Backend Supabase
+supabase functions deploy complete-flight --project-ref <project-ref>
+
+# Sidecar build (Windows)
+.\scripts\build-sidecar.ps1             # Publish + copie dans Tauri binaries
+
+# Supabase
+npx supabase gen types typescript --project-id <ref> > app/src/lib/database.types.ts
+```
+
+---
+
+## Architecture fichiers cles
+
+```
+Thurstline/
+├── app/                              # Tauri + React
+│   ├── src/
+│   │   ├── components/               # Layout, Sidebar, LiveFlightBar, SimStatusBadge, AirportPicker, FlightMap, OFPModal
+│   │   ├── contexts/                 # AuthContext, CompanyContext, SimContext, UnitsContext
+│   │   ├── data/                     # airports.ts (3232), aircraftTypes.ts (36)
+│   │   ├── hooks/                    # useSimStream, useRealtimeTable
+│   │   ├── lib/                      # supabase.ts, simBridge.ts, simbrief.ts, geo.ts, units.ts, database.types.ts
+│   │   └── pages/                    # Dashboard, Flights, Fleet, Dispatch, Crew, Finances, Settings, LiveFlight, Auth, Onboarding
+│   └── src-tauri/
+│       ├── src/lib.rs                # Sidecar spawn + kill
+│       ├── capabilities/default.json # Permissions (shell:allow-open, execute, spawn)
+│       └── tauri.conf.json           # Config Tauri, externalBin
+├── sim-bridge/                       # C# .NET 8
+│   ├── SimConnect/                   # ISimClient, MockSimClient (dispatch-driven), NativeSimConnectClient, FlightDetector, SimData
+│   ├── Cloud/Models/                 # DTOs Supabase (CompanyRow, AircraftRow, etc.)
+│   ├── Services/                     # YieldService, CashflowService, MaintenanceService, LandingProcessor
+│   ├── Session/                      # SessionStore
+│   └── Program.cs                    # Entry point, DI, endpoints, POST /mock/start-flight
+├── supabase/migrations/              # Schema SQL
+├── scripts/build-sidecar.ps1         # Build + deploy sidecar
+├── PLAN.md                           # Plan detaille
+└── PROGRESS.md                       # Cet etat d'avancement
+```

@@ -1,0 +1,122 @@
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useSim } from "@/contexts/SimContext";
+import { useUnits } from "@/contexts/UnitsContext";
+import { useCompany } from "@/contexts/CompanyContext";
+import { supabase } from "@/lib/supabase";
+import { Gauge, Navigation, Compass, Fuel, ArrowUpDown, Plane } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+/**
+ * Bandeau persistant affichant les SimVars en temps réel quand un vol est en cours.
+ * Ne rend rien si pas de données.
+ */
+export function LiveFlightBar() {
+  const { latest, simActive, currentPhase } = useSim();
+  const { fmt } = useUnits();
+  const { company } = useCompany();
+  const [flightInfo, setFlightInfo] = useState<{ flightNumber: string; origin: string; dest: string } | null>(null);
+
+  // Fetch the currently flying dispatch
+  useEffect(() => {
+    if (!company || !simActive) { setFlightInfo(null); return; }
+    supabase
+      .from("dispatches")
+      .select("flight_number, origin_icao, dest_icao")
+      .eq("company_id", company.id)
+      .eq("status", "flying")
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) setFlightInfo({ flightNumber: data.flight_number, origin: data.origin_icao, dest: data.dest_icao });
+      });
+  }, [company?.id, simActive]);
+
+  useEffect(() => {
+    const phaseLabels: Record<string, string> = {
+      preflight: "Preflight",
+      taxi_out: "Taxiing for departure",
+      takeoff: "Taking off",
+      climb: "Climbing",
+      cruise: "Cruising",
+      descent: "Descending",
+      approach: "On approach",
+      landing: "Landed",
+      taxi_in: "Taxiing to the gate",
+    };
+
+    const details = simActive
+      ? phaseLabels[currentPhase ?? ""] ?? (latest?.onGround ? "On the ground" : "Flying")
+      : "Managing a virtual airline";
+    const state = simActive && flightInfo
+      ? `Flying ${flightInfo.origin} to ${flightInfo.dest}`
+      : "In Thrustline";
+
+    invoke("update_discord_presence", { details, state }).catch(() => {
+      // Browser-only Vite development has no Tauri command backend.
+    });
+  }, [currentPhase, flightInfo, latest?.onGround, simActive]);
+
+  if (!latest || !simActive) return null;
+
+  const {
+    altitudeFt,
+    groundSpeedKts,
+    indicatedAirspeedKts,
+    headingDeg,
+    verticalSpeedFpm,
+    fuelTotalGal,
+    onGround,
+  } = latest;
+
+  return (
+    <div className="mx-3 mb-3 flex flex-wrap items-center gap-5 rounded-xl border border-brand-500/20 bg-brand-500/[0.04] px-5 py-3 text-xs glow-brand-sm animate-fade-in">
+      {/* Flight info */}
+      {flightInfo && (
+        <>
+          <span className="font-mono text-sm font-bold text-brand-300">{flightInfo.flightNumber}</span>
+          <span className="font-mono text-sm text-slate-300">
+            {flightInfo.origin} <span className="text-slate-600">→</span> {flightInfo.dest}
+          </span>
+          <div className="h-4 w-px bg-white/[0.06]" />
+        </>
+      )}
+      <Stat label="PHASE" value={onGround ? "GROUND" : "AIRBORNE"} icon={Plane} accent />
+      <div className="h-4 w-px bg-white/[0.06]" />
+      <Stat label="ALT" value={fmt.altitude(altitudeFt)} icon={ArrowUpDown} />
+      <Stat label="GS"  value={fmt.speed(groundSpeedKts)} icon={Gauge} />
+      <Stat label="IAS" value={fmt.speed(indicatedAirspeedKts)} icon={Navigation} />
+      <Stat label="HDG" value={`${Math.round(headingDeg)}\u00B0`} icon={Compass} />
+      <Stat label="V/S" value={fmt.vs(verticalSpeedFpm)} icon={ArrowUpDown} />
+      <Stat label="FUEL" value={fmt.fuel(fuelTotalGal)} icon={Fuel} />
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  icon: Icon,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  icon: LucideIcon;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Icon className={`h-3.5 w-3.5 ${accent ? "text-brand-300" : "text-slate-500"}`} />
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-[10px] uppercase tracking-wider text-slate-500">
+          {label}
+        </span>
+        <span
+          className={`font-mono text-sm font-medium ${accent ? "text-brand-300" : "text-slate-100"}`}
+        >
+          {value}
+        </span>
+      </div>
+    </div>
+  );
+}

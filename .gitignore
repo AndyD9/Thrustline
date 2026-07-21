@@ -1,13 +1,10 @@
-# Files
-**/PROGRESS.md
-**/PLAN.md
-
 # Dependencies
 node_modules/
 
 # Build output
 dist/
 dist-electron/
+coverage/
 
 # Generated Prisma client
 generated/
@@ -23,6 +20,7 @@ prisma/dev.db-journal
 # IDE
 .vscode/
 .idea/
+.vs/
 
 # Claude Code
 .claude/settings.local.json
@@ -33,3 +31,23 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Build artifacts
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+
+# .NET
+sim-bridge/bin/
+sim-bridge/obj/
+sim-bridge/publish/
+
+# Tauri
+app/src-tauri/target/
+app/src-tauri/binaries/
+
+# Claude worktrees
+.claude/worktrees/
+
+# Supabase CLI local state
+supabase/.temp/

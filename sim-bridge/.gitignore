@@ -1,0 +1,18 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+
+# User secrets & env
+appsettings.*.Local.json
+secrets.json
+.env
+
+# Rider / VS Code / VS
+.idea/
+.vs/
+.vscode/
+
+# Published output
+publish/
