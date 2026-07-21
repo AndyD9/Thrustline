@@ -501,10 +501,7 @@ export type Database = {
         Args: {
           p_company_id: string;
           p_principal: number;
-          p_monthly_payment: number;
-          p_remaining_amount: number;
           p_total_months: number;
-          p_interest_rate: number;
         };
         Returns: string;
       };

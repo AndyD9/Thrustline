@@ -64,13 +64,7 @@ Set-Location sim-bridge
 dotnet build
 ```
 
-Configure sidecar Supabase access with .NET user secrets, never frontend variables:
-
-```powershell
-Set-Location sim-bridge
-dotnet user-secrets set "Supabase:Url" "https://example.supabase.co"
-dotnet user-secrets set "Supabase:ServiceRoleKey" "<service-role-key>"
-```
+Deploy privileged operations as Supabase Edge Functions. The desktop and sidecar are public clients and must never receive the service-role key. See `supabase/SECURITY_DEPLOYMENT.md`.
 
 ## Architecture and conventions
 
@@ -91,8 +85,8 @@ dotnet user-secrets set "Supabase:ServiceRoleKey" "<service-role-key>"
 - `Program.cs` configures dependency injection, localhost REST endpoints, CORS, SignalR, and service startup.
 - `SimConnect/` owns simulator clients, polling, flight detection, and the SignalR hub.
 - `Services/` owns business rules and landing-processing behavior.
-- `Cloud/Models/` contains Supabase transport models; keep these aligned with migrations and frontend database types.
-- `Session/` tracks the logged-in user relayed from the frontend.
+- `Session/` tracks the validated JWT and active flight context in memory.
+- Privileged persistence is performed by Supabase Edge Functions, never by a service-role client in the sidecar.
 - Keep the bridge bound to localhost unless a task explicitly changes the security model.
 - Preserve cross-platform compilation. Native SimConnect behavior is Windows-specific and should remain isolated behind the existing abstraction.
 
@@ -101,7 +95,7 @@ dotnet user-secrets set "Supabase:ServiceRoleKey" "<service-role-key>"
 - Treat migrations as append-only history. Add a new timestamped migration rather than rewriting an applied migration.
 - Include appropriate RLS policies, constraints, indexes, triggers, and grants when adding data structures.
 - Keep `app/src/lib/database.types.ts` and affected C# models synchronized with schema changes.
-- The frontend may use only the anon key under RLS. The service-role key belongs exclusively in the sidecar's secrets/configuration and must never be logged or committed.
+- The frontend and sidecar may use only public configuration and user JWTs. The service-role key belongs exclusively to hosted Edge Functions and must never be shipped, logged, or committed.
 
 ### Tauri (`app/src-tauri`)
 

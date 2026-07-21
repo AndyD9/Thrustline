@@ -19,3 +19,5 @@ export const supabase = createClient<Database>(url ?? "", anonKey ?? "", {
     detectSessionInUrl: true,
   },
 });
+
+export const supabasePublicConfig = { url: url ?? "", anonKey: anonKey ?? "" };

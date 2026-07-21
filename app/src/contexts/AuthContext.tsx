@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabasePublicConfig } from "@/lib/supabase";
 import { clearSession, setSession as syncSimBridgeSession } from "@/lib/simBridge";
 
 interface AuthContextValue {
@@ -26,9 +26,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // ---- sync sim-bridge whenever auth changes ----
-  const syncBridge = useCallback(async (userId: string | null) => {
+  const syncBridge = useCallback(async (accessToken: string | null) => {
     try {
-      if (userId) await syncSimBridgeSession(userId);
+      if (accessToken) await syncSimBridgeSession(accessToken, supabasePublicConfig.url, supabasePublicConfig.anonKey);
       else await clearSession();
     } catch (e) {
       // sim-bridge may not be up yet in dev — log and continue
@@ -45,12 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSessionState(data.session);
       setLoading(false);
-      if (data.session?.user) syncBridge(data.session.user.id);
+      if (data.session) syncBridge(data.session.access_token);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSessionState(next);
-      syncBridge(next?.user.id ?? null);
+      syncBridge(next?.access_token ?? null);
     });
 
     return () => {

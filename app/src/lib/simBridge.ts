@@ -6,7 +6,23 @@
  * scénarios de test ou d'exécution découplée.
  */
 
+import { invoke } from "@tauri-apps/api/core";
+
 const BASE_URL = import.meta.env.VITE_SIM_BRIDGE_URL ?? "http://127.0.0.1:5055";
+let instanceTokenPromise: Promise<string> | null = null;
+
+export function getBridgeInstanceToken(): Promise<string> {
+  instanceTokenPromise ??= invoke<string>("get_bridge_instance_token")
+    .catch(() => import.meta.env.DEV ? "dev-only-bridge-token" : "");
+  return instanceTokenPromise;
+}
+
+export async function bridgeFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const token = await getBridgeInstanceToken();
+  const headers = new Headers(init.headers);
+  headers.set("X-Thrustline-Bridge-Token", token);
+  return fetch(input, { ...init, headers });
+}
 
 /** Tracks whether the sim-bridge is reachable to avoid spamming failed requests. */
 let bridgeReachable = false;
@@ -16,7 +32,7 @@ async function probeBridge(): Promise<boolean> {
   if (probeInFlight) return bridgeReachable;
   probeInFlight = true;
   try {
-    const res = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(2000) });
+    const res = await bridgeFetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(2000) });
     bridgeReachable = res.ok;
   } catch {
     bridgeReachable = false;
@@ -36,28 +52,42 @@ export interface HealthResponse {
 }
 
 export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
-  const res = await fetch(`${BASE_URL}/health`, { signal });
+  const res = await bridgeFetch(`${BASE_URL}/health`, { signal });
   if (!res.ok) throw new Error(`sim-bridge /health → ${res.status}`);
   bridgeReachable = true;
   return res.json();
 }
 
-export async function setSession(userId: string): Promise<void> {
+export async function setSession(accessToken: string, supabaseUrl: string, anonKey: string): Promise<void> {
   if (!bridgeReachable && !(await probeBridge())) return;
-  const res = await fetch(`${BASE_URL}/session`, {
+  const res = await bridgeFetch(`${BASE_URL}/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId }),
+    body: JSON.stringify({ accessToken, supabaseUrl, anonKey }),
   });
   if (!res.ok) throw new Error(`sim-bridge /session POST → ${res.status}`);
 }
 
 export async function clearSession(): Promise<void> {
   if (!bridgeReachable && !(await probeBridge())) return;
-  const res = await fetch(`${BASE_URL}/session`, { method: "DELETE" });
+  const res = await bridgeFetch(`${BASE_URL}/session`, { method: "DELETE" });
   if (!res.ok && res.status !== 204) {
     throw new Error(`sim-bridge /session DELETE → ${res.status}`);
   }
+}
+
+export async function setActiveFlightContext(context: {
+  dispatchId: string;
+  companyId: string;
+  economyPassengers: number;
+  businessPassengers: number;
+}): Promise<void> {
+  const res = await bridgeFetch(`${BASE_URL}/flight/context`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(context),
+  });
+  if (!res.ok && res.status !== 204) throw new Error(`sim-bridge /flight/context → ${res.status}`);
 }
 
 /** Base URL du SignalR hub /hubs/sim — utilisé par useSimStream. */

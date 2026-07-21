@@ -1,4 +1,5 @@
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
+use rand::{rngs::OsRng, RngCore};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -18,7 +19,7 @@ const DISCORD_APPLICATION_ID: &str = "1528802892881068082";
 ///
 /// On macOS/Linux the binary may not exist — the sidecar silently fails to spawn
 /// and the front falls back to its "sim-bridge offline" banner.
-fn spawn_sim_bridge(app: &tauri::AppHandle) {
+fn spawn_sim_bridge(app: &tauri::AppHandle, instance_token: &str) {
     let shell = app.shell();
     let command = match shell.sidecar("sim-bridge") {
         Ok(cmd) => cmd,
@@ -28,7 +29,7 @@ fn spawn_sim_bridge(app: &tauri::AppHandle) {
         }
     };
 
-    match command.spawn() {
+    match command.env("THRUSTLINE_BRIDGE_TOKEN", instance_token).spawn() {
         Ok((mut rx, child)) => {
             // Store child handle so we can kill it on app exit
             app.manage(SidecarChild(std::sync::Mutex::new(Some(child))));
@@ -61,6 +62,13 @@ fn spawn_sim_bridge(app: &tauri::AppHandle) {
 
 /// Holds the sidecar child process so we can kill it on app close.
 struct SidecarChild(std::sync::Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
+
+struct BridgeInstanceToken(String);
+
+#[tauri::command]
+fn get_bridge_instance_token(token: tauri::State<'_, BridgeInstanceToken>) -> String {
+    token.0.clone()
+}
 
 #[derive(Clone, PartialEq)]
 struct DiscordActivity {
@@ -158,7 +166,10 @@ fn update_discord_presence(
     state: String,
 ) {
     if let Ok(mut activity) = presence.activity.lock() {
-        *activity = DiscordActivity { details, state };
+        *activity = DiscordActivity {
+            details: details.chars().take(128).collect(),
+            state: state.chars().take(128).collect(),
+        };
     }
 }
 
@@ -166,9 +177,13 @@ fn update_discord_presence(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![update_discord_presence])
+        .invoke_handler(tauri::generate_handler![update_discord_presence, get_bridge_instance_token])
         .setup(|app| {
-            spawn_sim_bridge(&app.handle());
+            let mut random = [0u8; 32];
+            OsRng.fill_bytes(&mut random);
+            let instance_token = random.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+            app.manage(BridgeInstanceToken(instance_token.clone()));
+            spawn_sim_bridge(&app.handle(), &instance_token);
             app.manage(DiscordPresence::start());
             Ok(())
         })

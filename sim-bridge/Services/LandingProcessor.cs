@@ -1,406 +1,68 @@
-using Supabase.Postgrest;
-using Thrustline.Bridge.Cloud;
-using Thrustline.Bridge.Cloud.Models;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using Thrustline.Bridge.Session;
 using Thrustline.Bridge.SimConnect;
 
 namespace Thrustline.Bridge.Services;
 
-/// <summary>
-/// Orchestre tout le traitement d'un atterrissage :
-///   1. Vérifie qu'il y a une session utilisateur + Supabase configuré
-///   2. Charge la compagnie active de l'utilisateur
-///   3. Cherche un dispatch "flying" pour lier le vol (sans dispatch → skip, v1)
-///   4. Charge l'avion (depuis dispatch ou active_aircraft_id)
-///   5. Charge la réputation existante sur la route (ou 50 par défaut)
-///   6. Calcule revenue (YieldService), fuel/landing/net (CashflowService)
-///   7. Applique l'usure (MaintenanceService)
-///   8. Écrit dans Supabase :
-///        - insert flights
-///        - insert 3 transactions (revenue, fuel, landing_fee)
-///        - update companies.capital
-///        - update aircraft (health_pct, cycles, total_hours)
-///        - upsert reputations (score ajusté selon |vs|, flight_count++)
-///        - update dispatch.status = 'completed'
-/// </summary>
-public class LandingProcessor
+/// <summary>Forwards raw landing telemetry to the authenticated server operation.</summary>
+public sealed class LandingProcessor(
+    ISessionStore sessionStore,
+    PassengerExperienceService passengerExperience,
+    IHttpClientFactory httpClientFactory,
+    ILogger<LandingProcessor> log)
 {
-    private readonly ISupabaseClientProvider _supabase;
-    private readonly ISessionStore _session;
-    private readonly YieldService _yield;
-    private readonly CashflowService _cashflow;
-    private readonly MaintenanceService _maintenance;
-    private readonly LandingGradeService _grade;
-    private readonly FuelValidationService _fuelValidation;
-    private readonly PaxSatisfactionService _paxSatisfaction;
-    private readonly PassengerExperienceService _passengerExperience;
-    private readonly AcarsService _acars;
-    private readonly AchievementService _achievements;
-    private readonly CompanyBonusService _bonuses;
-    private readonly ILogger<LandingProcessor> _log;
-
-    public LandingProcessor(
-        ISupabaseClientProvider supabase,
-        ISessionStore session,
-        YieldService yield,
-        CashflowService cashflow,
-        MaintenanceService maintenance,
-        LandingGradeService grade,
-        FuelValidationService fuelValidation,
-        PaxSatisfactionService paxSatisfaction,
-        PassengerExperienceService passengerExperience,
-        AcarsService acars,
-        AchievementService achievements,
-        CompanyBonusService bonuses,
-        ILogger<LandingProcessor> log)
-    {
-        _supabase = supabase;
-        _session = session;
-        _yield = yield;
-        _cashflow = cashflow;
-        _maintenance = maintenance;
-        _grade = grade;
-        _fuelValidation = fuelValidation;
-        _paxSatisfaction = paxSatisfaction;
-        _passengerExperience = passengerExperience;
-        _acars = acars;
-        _achievements = achievements;
-        _bonuses = bonuses;
-        _log = log;
-    }
-
     public async Task ProcessAsync(LandingEvent evt, CancellationToken ct = default)
     {
-        if (!_supabase.IsConfigured)
+        var session = sessionStore.Current;
+        if (session is null)
         {
-            _log.LogWarning("Landing detected but Supabase not configured — skipping persistence.");
+            log.LogWarning("Landing detected without an authenticated backend session");
             return;
         }
 
-        var userId = _session.CurrentUserId;
-        if (userId is null)
+        var operationId = Guid.NewGuid();
+        var completedExperience = passengerExperience.Completed;
+        var payload = new
         {
-            _log.LogWarning("Landing detected but no session user set — skipping persistence.");
-            return;
-        }
+            operationId,
+            evt.DistanceNm,
+            evt.FuelUsedGal,
+            evt.DurationMin,
+            evt.LandingVsFpm,
+            paxSatisfaction = completedExperience?.Satisfaction,
+        };
+        var endpoint = new Uri(session.SupabaseUrl, "/functions/v1/complete-flight");
 
-        try
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            await _supabase.EnsureInitializedAsync(ct);
-            var client = _supabase.Client;
-
-            // 1. Compagnie active
-            var company = (await client.From<CompanyRow>()
-                .Where(c => c.UserId == userId.Value)
-                .Single(ct))
-                ?? throw new InvalidOperationException($"No company for user {userId}");
-
-            // 2. Dispatch flying (optionnel mais fortement conseillé en v1)
-            var dispatchResp = await client.From<DispatchRow>()
-                .Where(d => d.CompanyId == company.Id)
-                .Where(d => d.Status == DispatchRow.StatusFlying)
-                .Limit(1)
-                .Get(ct);
-            var dispatch = dispatchResp.Models.FirstOrDefault();
-
-            if (dispatch is null)
-            {
-                _log.LogWarning("Landing ignored: no flying dispatch for company {Company}. " +
-                                "Create a dispatch and set it to 'flying' before landing.", company.Name);
-                return;
-            }
-
-            // 3. Avion : depuis dispatch.aircraft_id ou company.active_aircraft_id
-            var aircraftId = dispatch.AircraftId ?? company.ActiveAircraftId;
-            AircraftRow? aircraft = null;
-            if (aircraftId is not null)
-            {
-                aircraft = await client.From<AircraftRow>()
-                    .Where(a => a.Id == aircraftId.Value)
-                    .Single(ct);
-            }
-
-            // 4. Réputation sur la route
-            var repResp = await client.From<ReputationRow>()
-                .Where(r => r.CompanyId == company.Id)
-                .Where(r => r.OriginIcao == dispatch.OriginIcao)
-                .Where(r => r.DestIcao == dispatch.DestIcao)
-                .Limit(1)
-                .Get(ct);
-            var reputation = repResp.Models.FirstOrDefault();
-            var repScore = reputation?.Score ?? 50m;
-
-            // 5. Load company bonuses (partnerships + marketing campaigns + route pricing)
-            decimal routePriceModifier = 1.0m;
             try
             {
-                var routeData = await client.From<RouteRow>()
-                    .Where(r => r.CompanyId == company.Id)
-                    .Where(r => r.OriginIcao == dispatch.OriginIcao)
-                    .Where(r => r.DestIcao == dispatch.DestIcao)
-                    .Limit(1)
-                    .Get(ct);
-                var route = routeData.Models.FirstOrDefault();
-                if (route is not null) routePriceModifier = route.PriceModifier;
-            }
-            catch { /* route may not exist yet, default 1.0 is fine */ }
-
-            var bonuses = await _bonuses.GetActiveBonusesAsync(
-                company.Id, dispatch.OriginIcao, dispatch.DestIcao, routePriceModifier, ct);
-
-            // 6. Calculs (with bonuses applied)
-            var distanceNm = (decimal)evt.DistanceNm;
-            var fuelUsedGal = (decimal)evt.FuelUsedGal;
-            var landingVsFpm = (decimal)evt.LandingVsFpm;
-
-            var revenue = _yield.Compute(dispatch.PaxEco, dispatch.PaxBiz, distanceNm, repScore, bonuses.PriceModifier);
-            var fuelMult = 1.0m - bonuses.FuelDiscount; // e.g., 0.10 discount → 0.90 multiplier
-            var fin = _cashflow.Compute(revenue, fuelUsedGal, fuelMult);
-
-            // Landing grade, fuel validation, pax satisfaction (with catering bonus)
-            var gradeResult = _grade.Compute(landingVsFpm);
-            var fuelResult = _fuelValidation.Compute(fuelUsedGal, dispatch);
-            var realtimePax = _passengerExperience.Completed;
-            var paxSat = realtimePax is not null
-                ? Math.Round(Math.Clamp((decimal)realtimePax.Satisfaction + bonuses.PaxSatisfactionBonus, 0m, 100m), 2)
-                : _paxSatisfaction.Compute(landingVsFpm, evt.DurationMin, dispatch, bonuses.PaxSatisfactionBonus);
-
-            MaintenanceUpdate? maint = null;
-            if (aircraft is not null)
-            {
-                var wearMult = 1.0m - bonuses.MaintenanceDiscount; // e.g., 0.15 → 0.85
-                maint = _maintenance.Apply(
-                    aircraft.HealthPct,
-                    aircraft.Cycles,
-                    aircraft.TotalHours,
-                    evt.DurationMin,
-                    landingVsFpm,
-                    wearMult);
-            }
-
-            // 6. Insert flight
-            var flight = new FlightRow
-            {
-                UserId = userId.Value,
-                CompanyId = company.Id,
-                AircraftId = aircraft?.Id,
-                DispatchId = dispatch.Id,
-                DepartureIcao = dispatch.OriginIcao,
-                ArrivalIcao = dispatch.DestIcao,
-                DurationMin = evt.DurationMin,
-                FuelUsedGal = fuelUsedGal,
-                DistanceNm = distanceNm,
-                LandingVsFpm = landingVsFpm,
-                Revenue = fin.Revenue,
-                FuelCost = fin.FuelCost,
-                LandingFee = fin.LandingFee,
-                NetResult = fin.NetResult,
-                LandingGrade = gradeResult.Grade,
-                PlannedFuelGal = fuelResult.PlannedFuelGal,
-                FuelAccuracyPct = fuelResult.FuelAccuracyPct,
-                PaxSatisfaction = paxSat,
-                PaxEco = dispatch.BoardedPaxEco,
-                PaxBiz = dispatch.BoardedPaxBiz,
-                LoadFactorPct = dispatch.PaxEco + dispatch.PaxBiz > 0
-                    ? Math.Round((dispatch.BoardedPaxEco + dispatch.BoardedPaxBiz) * 100m / (dispatch.PaxEco + dispatch.PaxBiz), 2)
-                    : 0,
-                MaintenanceCost = 0,
-                OperationMode = "player",
-                StartedAt = evt.Takeoff.Timestamp.UtcDateTime,
-                CompletedAt = evt.Touchdown.Timestamp.UtcDateTime,
-            };
-            var insertedFlight = (await client.From<FlightRow>().Insert(flight, cancellationToken: ct))
-                .Models.First();
-
-            // 7. Transactions (revenue, fuel, landing_fee)
-            var transactions = new List<TransactionRow>
-            {
-                new()
+                using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", session.AccessToken);
+                request.Content = JsonContent.Create(payload);
+                using var response = await httpClientFactory.CreateClient().SendAsync(request, ct);
+                if (response.IsSuccessStatusCode)
                 {
-                    UserId = userId.Value,
-                    CompanyId = company.Id,
-                    FlightId = insertedFlight.Id,
-                    Type = TransactionRow.TypeRevenue,
-                    Amount = fin.Revenue,
-                    Description = $"Ticket sales {dispatch.OriginIcao}→{dispatch.DestIcao} ({dispatch.FlightNumber})"
-                },
-                new()
-                {
-                    UserId = userId.Value,
-                    CompanyId = company.Id,
-                    FlightId = insertedFlight.Id,
-                    Type = TransactionRow.TypeFuel,
-                    Amount = -fin.FuelCost,
-                    Description = $"Fuel {fuelUsedGal:F0} gal — {dispatch.FlightNumber}"
-                },
-                new()
-                {
-                    UserId = userId.Value,
-                    CompanyId = company.Id,
-                    FlightId = insertedFlight.Id,
-                    Type = TransactionRow.TypeLandingFee,
-                    Amount = -fin.LandingFee,
-                    Description = $"Landing fee {dispatch.DestIcao}"
+                    log.LogInformation("Landing finalized by server operation {OperationId}", operationId);
+                    return;
                 }
-            };
-            await client.From<TransactionRow>().Insert(transactions, cancellationToken: ct);
 
-            // 8. Update capital compagnie
-            await client.From<CompanyRow>()
-                .Where(c => c.Id == company.Id)
-                .Set(c => c.Capital, company.Capital + fin.NetResult)
-                .Update(cancellationToken: ct);
-
-            // 9. Update aircraft (health/cycles/hours)
-            if (aircraft is not null && maint is not null)
-            {
-                await client.From<AircraftRow>()
-                    .Where(a => a.Id == aircraft.Id)
-                    .Set(a => a.HealthPct, maint.HealthPct)
-                    .Set(a => a.Cycles, maint.Cycles)
-                    .Set(a => a.TotalHours, maint.TotalHours)
-                    .Set(a => a.CurrentAirportIcao, dispatch.DestIcao)
-                    .Update(cancellationToken: ct);
-            }
-
-            // 10. Upsert reputation (enriched with pax satisfaction)
-            var repAdjustment = ComputeReputationAdjustment(landingVsFpm, paxSat);
-            if (reputation is null)
-            {
-                await client.From<ReputationRow>().Insert(new ReputationRow
+                var error = await response.Content.ReadAsStringAsync(ct);
+                if ((int)response.StatusCode is >= 400 and < 500)
                 {
-                    UserId = userId.Value,
-                    CompanyId = company.Id,
-                    OriginIcao = dispatch.OriginIcao,
-                    DestIcao = dispatch.DestIcao,
-                    Score = Math.Clamp(50m + repAdjustment, 0m, 100m),
-                    FlightCount = 1
-                }, cancellationToken: ct);
+                    log.LogWarning("Landing rejected by backend ({Status}): {Error}", response.StatusCode, error);
+                    return;
+                }
+                log.LogWarning("Landing backend attempt {Attempt} failed with {Status}", attempt, response.StatusCode);
             }
-            else
+            catch (HttpRequestException ex) when (attempt < 3)
             {
-                var newScore = Math.Clamp(reputation.Score + repAdjustment, 0m, 100m);
-                await client.From<ReputationRow>()
-                    .Where(r => r.Id == reputation.Id)
-                    .Set(r => r.Score, newScore)
-                    .Set(r => r.FlightCount, reputation.FlightCount + 1)
-                    .Update(cancellationToken: ct);
+                log.LogWarning(ex, "Landing backend attempt {Attempt} failed", attempt);
             }
 
-            // 11. Dispatch → completed
-            await client.From<DispatchRow>()
-                .Where(d => d.Id == dispatch.Id)
-                .Set(d => d.Status, DispatchRow.StatusCompleted)
-                .Update(cancellationToken: ct);
-
-            // 12. Advance a linked schedule and unlock only its next continuous leg.
-            await AdvanceScheduleAsync(dispatch.Id, ct);
-
-            // 13. Link ACARS reports to this flight
-            await _acars.LinkReportsToFlight(dispatch.Id, insertedFlight.Id, ct);
-            _acars.EndFlight();
-
-            // 14. Check achievements
-            await _achievements.CheckAndAwardAsync(insertedFlight, company, userId.Value, ct);
-
-            // 15. Update global reputation
-            var globalRep = await _bonuses.RecalculateGlobalReputationAsync(company.Id, ct);
-            await client.From<CompanyRow>()
-                .Where(c => c.Id == company.Id)
-                .Set(c => c.GlobalReputation, globalRep)
-                .Update(cancellationToken: ct);
-
-            _log.LogInformation(
-                "✅ Landing persisted: flight {Flight} {From}→{To} grade={Grade} revenue={Rev:C} fuel={Fuel:C} net={Net:C} paxSat={Pax:F0}",
-                insertedFlight.Id, dispatch.OriginIcao, dispatch.DestIcao,
-                gradeResult.Grade, fin.Revenue, fin.FuelCost, fin.NetResult, paxSat);
+            if (attempt < 3) await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct);
         }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "Failed to persist landing to Supabase.");
-        }
-    }
-
-    private async Task AdvanceScheduleAsync(Guid dispatchId, CancellationToken ct)
-    {
-        var client = _supabase.Client;
-        var linkedResponse = await client.From<ScheduleLegRow>()
-            .Where(leg => leg.DispatchId == dispatchId)
-            .Limit(1)
-            .Get(ct);
-        var completedLeg = linkedResponse.Models.FirstOrDefault();
-        if (completedLeg is null) return;
-
-        await client.From<ScheduleLegRow>()
-            .Where(leg => leg.Id == completedLeg.Id)
-            .Set(leg => leg.Status, "completed")
-            .Set(leg => leg.CompletedAt, DateTime.UtcNow)
-            .Update(cancellationToken: ct);
-
-        var allLegsResponse = await client.From<ScheduleLegRow>()
-            .Where(leg => leg.ScheduleId == completedLeg.ScheduleId)
-            .Get(ct);
-        var allLegs = allLegsResponse.Models.OrderBy(leg => leg.Sequence).ToList();
-        var nextLeg = allLegs.FirstOrDefault(leg => leg.Sequence > completedLeg.Sequence && leg.Status == "planned");
-
-        var currentRotationLegs = allLegs.Where(leg => leg.RotationId == completedLeg.RotationId).ToList();
-        if (currentRotationLegs.All(leg => leg.Id == completedLeg.Id || leg.Status == "completed"))
-        {
-            await client.From<ScheduleRotationRow>()
-                .Where(rotation => rotation.Id == completedLeg.RotationId)
-                .Set(rotation => rotation.Status, "completed")
-                .Update(cancellationToken: ct);
-        }
-
-        if (nextLeg is null)
-        {
-            await client.From<ScheduleRow>()
-                .Where(schedule => schedule.Id == completedLeg.ScheduleId)
-                .Set(schedule => schedule.Status, "completed")
-                .Set(schedule => schedule.CompletedAt, DateTime.UtcNow)
-                .Update(cancellationToken: ct);
-            return;
-        }
-
-        await client.From<ScheduleLegRow>()
-            .Where(leg => leg.Id == nextLeg.Id)
-            .Set(leg => leg.Status, "available")
-            .Update(cancellationToken: ct);
-
-        if (nextLeg.RotationId != completedLeg.RotationId)
-        {
-            await client.From<ScheduleRotationRow>()
-                .Where(rotation => rotation.Id == nextLeg.RotationId)
-                .Set(rotation => rotation.Status, "active")
-                .Update(cancellationToken: ct);
-        }
-    }
-
-    /// <summary>
-    /// Ajuste la réputation selon la qualité de l'atterrissage (vs en fpm)
-    /// et la satisfaction passagers.
-    /// </summary>
-    private static decimal ComputeReputationAdjustment(decimal landingVsFpm, decimal paxSatisfaction)
-    {
-        var absVs = Math.Abs(landingVsFpm);
-        var baseAdj = absVs switch
-        {
-            < 150m  =>  1.0m,   // greaser
-            < 300m  =>  0.5m,   // nice touchdown
-            < 600m  =>  0.0m,   // acceptable
-            < 1000m => -1.0m,   // hard
-            _       => -3.0m,   // very hard, pax not happy
-        };
-
-        // Pax satisfaction bonus/penalty
-        var paxAdj = paxSatisfaction switch
-        {
-            > 90m => 0.5m,
-            > 80m => 0.3m,
-            < 40m => -0.5m,
-            _     => 0.0m,
-        };
-
-        return baseAdj + paxAdj;
+        log.LogError("Landing operation {OperationId} could not be persisted after retries", operationId);
     }
 }

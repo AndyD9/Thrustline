@@ -96,24 +96,10 @@ export default function Company() {
   // Toggle partnership
   const togglePartner = async (partnerDef: typeof PARTNERS[0]) => {
     const existing = partnerships.find((p) => p.partner_key === partnerDef.key);
-    if (existing) {
-      // Toggle active
-      if (!existing.active && activeCount >= MAX_ACTIVE_PARTNERSHIPS) return; // at max
-      await supabase.from("partnerships").update({ active: !existing.active }).eq("id", existing.id);
-    } else {
-      // Create new
-      if (activeCount >= MAX_ACTIVE_PARTNERSHIPS) return;
-      await supabase.from("partnerships").insert({
-        user_id: company.user_id,
-        company_id: company.id,
-        partner_key: partnerDef.key,
-        partner_name: partnerDef.name,
-        bonus_type: partnerDef.bonusType,
-        bonus_value: partnerDef.bonusValue,
-        monthly_cost: partnerDef.monthlyCost,
-        active: true,
-      });
-    }
+    if ((!existing || !existing.active) && activeCount >= MAX_ACTIVE_PARTNERSHIPS) return;
+    const invoke = supabase.rpc.bind(supabase) as unknown as (name: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+    const { error } = await invoke("toggle_partnership", { p_company_id: company.id, p_partner_key: partnerDef.key });
+    if (error) throw new Error(error.message);
     loadData();
   };
 
@@ -124,31 +110,13 @@ export default function Company() {
     const totalCost = campaignTotalCost(def);
     if (company.capital < totalCost) return; // can't afford
 
-    const now = new Date();
-    const expires = new Date(now.getTime() + def.durationDays * 86400000);
     const targetRoute = def.scope === "route" ? campaignRoute : null;
-
-    await supabase.from("marketing_campaigns").insert({
-      user_id: company.user_id,
-      company_id: company.id,
-      campaign_type: def.type,
-      scope: def.scope,
-      target_route: targetRoute,
-      demand_multiplier: def.demandMultiplier,
-      daily_cost: def.dailyCost,
-      started_at: now.toISOString(),
-      expires_at: expires.toISOString(),
+    const invoke = supabase.rpc.bind(supabase) as unknown as (name: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+    const { error } = await invoke("purchase_marketing_campaign", {
+      p_company_id: company.id, p_campaign_type: def.type, p_duration_days: def.durationDays,
+      p_demand_multiplier: def.demandMultiplier, p_daily_cost: def.dailyCost, p_target_route: targetRoute,
     });
-
-    // Debit upfront cost
-    await supabase.from("companies").update({ capital: company.capital - totalCost }).eq("id", company.id);
-    await supabase.from("transactions").insert({
-      user_id: company.user_id,
-      company_id: company.id,
-      type: "maintenance",
-      amount: -totalCost,
-      description: `Marketing: ${def.name}${targetRoute ? ` (${targetRoute})` : ""}`,
-    });
+    if (error) throw new Error(error.message);
 
     setShowCampaignModal(false);
     setSelectedCampaign(null);
@@ -159,23 +127,9 @@ export default function Company() {
 
   // Cancel campaign (refund remaining days)
   const cancelCampaign = async (campaign: MarketingCampaign) => {
-    const remaining = Math.max(0, Math.ceil((new Date(campaign.expires_at).getTime() - Date.now()) / 86400000));
-    const refund = Math.round(campaign.daily_cost * remaining);
-
-    // Delete campaign
-    await supabase.from("marketing_campaigns").delete().eq("id", campaign.id);
-
-    // Refund remaining cost
-    if (refund > 0) {
-      await supabase.from("companies").update({ capital: company.capital + refund }).eq("id", company.id);
-      await supabase.from("transactions").insert({
-        user_id: company.user_id,
-        company_id: company.id,
-        type: "revenue",
-        amount: refund,
-        description: `Campaign cancelled: ${campaign.campaign_type.replace("_", " ")} — ${remaining}d refund`,
-      });
-    }
+    const invoke = supabase.rpc.bind(supabase) as unknown as (name: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+    const { error } = await invoke("cancel_marketing_campaign", { p_company_id: company.id, p_campaign_id: campaign.id });
+    if (error) throw new Error(error.message);
 
     refetch();
     loadData();

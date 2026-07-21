@@ -78,19 +78,11 @@ VITE_SUPABASE_URL=https://votre-projet.supabase.co
 VITE_SUPABASE_ANON_KEY=votre-cle-anon
 ```
 
-La cle anonyme est utilisee uniquement avec les politiques RLS de Supabase. Ne placez jamais la cle `service_role` dans le frontend.
+La cle anonyme est utilisee avec les politiques RLS. La cle `service_role` reste exclusivement dans les secrets des Edge Functions Supabase et n'est jamais installee sur un poste utilisateur.
 
-### 3. Configurer le sim-bridge
+### 3. Configurer le backend securise
 
-Depuis la racine du depot :
-
-```powershell
-Set-Location sim-bridge
-dotnet user-secrets set "Supabase:Url" "https://votre-projet.supabase.co"
-dotnet user-secrets set "Supabase:ServiceRoleKey" "votre-cle-service-role"
-```
-
-La cle `service_role` doit rester dans les secrets .NET et ne doit jamais etre commitee.
+Appliquez les migrations puis deployez `supabase/functions/complete-flight`. Le sim-bridge recoit la configuration publique et le JWT depuis l'application authentifiee; aucun secret backend ne lui est fourni. Voir `supabase/SECURITY_DEPLOYMENT.md`.
 
 ### 4. Initialiser la base de donnees
 

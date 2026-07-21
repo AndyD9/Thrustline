@@ -9,7 +9,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <UserSecretsId>e289fb10-9806-4a52-bbef-50dcfb24d6f9</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
