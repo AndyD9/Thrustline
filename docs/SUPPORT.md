@@ -1,6 +1,6 @@
 # Plateformes prises en charge
 
-Dernière mise à jour : 24 juillet 2026  
+Dernière mise à jour : 24 juillet 2026
 Décision acceptée : `ADR-0003`
 
 Thrustline cible une application desktop **Windows 11 x64** connectée localement

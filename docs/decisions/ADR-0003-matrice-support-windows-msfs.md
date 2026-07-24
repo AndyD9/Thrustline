@@ -1,9 +1,9 @@
 # ADR-0003 — Matrice de support Windows et Microsoft Flight Simulator
 
-Status: Accepted  
-Date: 2026-07-24  
-Deciders: Andy (Product Owner)  
-Supersedes: —  
+Status: Accepted
+Date: 2026-07-24
+Deciders: Andy (Product Owner)
+Supersedes: —
 Superseded by: —
 
 ## Context

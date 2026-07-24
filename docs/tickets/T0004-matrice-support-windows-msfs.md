@@ -1,10 +1,10 @@
 # T0004 — Définir la matrice de support Windows et MSFS
 
-Status: Done  
-Owner: Andy  
-Branch: `docs/t0004-matrice-support`  
-Phase: 0  
-Risk: High  
+Status: Done
+Owner: Andy
+Branch: `docs/t0004-matrice-support`
+Phase: 0
+Risk: High
 Security-sensitive: No
 
 ## Goal
