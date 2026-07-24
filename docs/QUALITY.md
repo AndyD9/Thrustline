@@ -33,10 +33,12 @@ résultat.
 
 ### Manuel MSFS
 
-- MSFS fermé, lancement tardif et redémarrage.
-- Vol normal, touch-and-go, go-around, pause, slew et accélération temporelle.
-- Perte réseau pendant et après le vol.
-- Plusieurs appareils/add-ons représentatifs.
+- Exécuter les quatorze scénarios définis par `ADR-0003` pour la première
+  promotion de chaque canal MSFS 2024 vers `Supported`.
+- Conserver une fiche distincte Store/Steam dans `docs/validation/platforms/`
+  avec versions exactes, commit, appareil, résultat, testeur, anomalies et trace.
+- Après Sim Update, exécuter au minimum les scénarios smoke 1–5, 9–11 et 14 avant
+  de retirer l'état `Compatibility pending`.
 
 ## Matrice de validation par zone
 
@@ -49,6 +51,7 @@ résultat.
 | Contrat transverse | tests de contrat + builds des consommateurs |
 | Sécurité | scénario d'abus et contrôle rejeté |
 | Release | VM propre, signature, upgrade et rollback |
+| Plateforme `Supported` | fiche réelle Windows/MSFS par canal + protocole ADR-0003 |
 
 ## Budgets initiaux à fixer en phase 0
 
@@ -81,6 +84,9 @@ Le Completion Report conserve :
 - étapes manuelles et résultat ;
 - capture ou extrait uniquement si utile et sans donnée sensible.
 
+Une documentation fournisseur ou un test effectué sur un autre canal MSFS ne
+remplace jamais la fiche réelle exigée pour une combinaison `Supported`.
+
 ## Release gate
 
 Une release publique exige :
@@ -93,4 +99,3 @@ Une release publique exige :
 - SBOM/checksums/provenance ;
 - parcours critiques sur VM propre ;
 - notes de version, limitations et procédure de rollback.
-

@@ -53,6 +53,7 @@ Supabase
 ### Bridge .NET
 
 - Connexion/reconnexion SimConnect.
+- Client hors processus self-contained Windows x64, limité à la session locale.
 - Normalisation, validation et agrégation de la télémétrie.
 - Machine à états de vol déterministe et rejouable.
 - Rapport de vol versionné.
@@ -162,3 +163,6 @@ de caractérisation malgré l'absence de migration de code.
 - `ADR-0002` : réécriture totale isolée dans un nouveau dépôt ; ancien dépôt
   conservé comme référence en lecture seule, nouveau schéma sans migration des
   données de développement et une seule bascule publique après parité.
+- `ADR-0003` : Windows 11 x64 maintenu et MSFS 2024 stable uniquement ; Store et
+  Steam sont validés séparément, sans support Windows 10, ARM64, MSFS 2020,
+  Insider ou Preview. WebView2 Evergreen et bridge .NET self-contained.

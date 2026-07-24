@@ -25,6 +25,8 @@ Statut : `Open`, `Accepted`, `Scheduled`, `Resolved`, `Invalid`.
 | KI-008 | High | Rebuild | Une réécriture totale peut omettre des comportements actuels non caractérisés. | ADR-0002 : couverture automatisée faible face au périmètre existant | Caractérisation du golden path | Open |
 | KI-009 | High | Bridge | Aucun corpus de traces SimConnect rejouables n'est fourni pour prouver la parité du moteur de vol. | T0001 et ADR-0002 | Premier vertical slice SimConnect | Open |
 | KI-010 | High | Release | Après création de données réelles dans le nouveau schéma, aucun retour vers l'ancien produit ne sera possible. | ADR-0002 : nouveau schéma sans compatibilité descendante | Phase 6 | Accepted |
+| KI-011 | High | Support | Aucune preuve réelle distincte ne valide encore MSFS 2024 Microsoft Store/Xbox App et Steam ; une seule machine de test est disponible. | T0004 et proposition ADR-0003 | Validation plateformes / premier vertical slice SimConnect | Open |
+| KI-012 | Medium | Support | Le profil matériel minimum Thrustline n'est pas mesuré ; la machine Ryzen 7 5800X, 32 Go, RX 6070 XT ne prouve que le profil recommandé cible. | Réponses Andy et ADR-0003 | T0005 | Open |
 
 ## Règles
 
