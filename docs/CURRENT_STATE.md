@@ -1,6 +1,6 @@
 # État actuel du dépôt
 
-Dernière revue documentaire : 24 juillet 2026 (ticket T0001).  
+Dernière revue documentaire : 24 juillet 2026 (ticket T0003).
 Statut : baseline locale vérifiée ; validations externes encore requises.
 
 ## Produit
@@ -139,7 +139,8 @@ explicite. Ces échecs sont classés comme environnement, pas comme défauts du 
   atomiques.
 - Pas de pipeline complet de release signée/updater.
 - Versions répétées dans plusieurs manifestes.
-- Modèle solo ou VA collaborative non tranché.
+- Politique de suppression/récupération du propriétaire et durée de rétention à
+  définir avant toute suppression irréversible.
 
 ## Travail local à préserver
 
@@ -149,11 +150,29 @@ pendant T0001. Son empreinte SHA-256 avant et après validation est
 Les autres modifications utilisateur préexistantes n'ont pas été intégrées au
 ticket.
 
+## Décision produit
+
+`ADR-0001` retient un MVP solo connecté préparé pour une collaboration
+ultérieure : au plus une compagnie par utilisateur, un propriétaire humain
+unique, aucun membre ni rôle collaboratif dans le MVP. La collaboration probable
+après le MVP exigera une nouvelle ADR.
+
+## Décision de refonte
+
+`ADR-0002` retient une réécriture totale isolée dans un nouveau dépôt avec un
+historique Git neuf. Le dépôt actuel devient une référence en lecture seule pour
+l'UX, les comportements et la documentation jusqu'à parité du golden path, puis
+il sera archivé. Le nouveau produit utilise un schéma Supabase neuf : les données
+actuelles sont uniquement des données de développement et ne seront pas migrées.
+Il n'y aura ni coexistence en production, ni double écriture, ni ancien client
+connecté au nouveau backend. Une seule bascule publique est prévue après les
+gates de caractérisation, SimConnect, parité, restauration et distribution.
+
 ## Prochain ticket recommandé
 
-`T0002 — Choisir le modèle produit solo ou collaboratif`. Cette décision précède
-le schéma cible, les rôles, les politiques RLS et la stratégie de refonte. La
-matrice Windows/MSFS sera traitée ensuite dans T0004.
+Créer et exécuter un ticket borné de caractérisation du golden path et des traces
+SimConnect avant le nouveau socle. La matrice Windows/MSFS reste planifiée dans
+T0004.
 
 ## Mise à jour de ce fichier
 

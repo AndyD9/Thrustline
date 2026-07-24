@@ -21,7 +21,10 @@ Statut : `Open`, `Accepted`, `Scheduled`, `Resolved`, `Invalid`.
 | KI-004 | Medium | Bridge | Pas de projet de tests .NET/replay SimConnect constaté. | Audit initial | Phase 3 | Open |
 | KI-005 | Medium | Frontend | Plusieurs pages mélangent UI, règles et accès aux données. | Audit initial | Phase 4 | Open |
 | KI-006 | Medium | Docs | Documentation historique partiellement désynchronisée. | Audit initial | T0001 | Open |
-| KI-007 | Medium | Product | Mode solo ou VA collaborative non tranché. | Audit initial | T0002 | Open |
+| KI-007 | Medium | Product | Mode solo ou VA collaborative non tranché. | ADR-0001 : MVP solo préparé pour collaboration ultérieure | T0002 | Resolved |
+| KI-008 | High | Rebuild | Une réécriture totale peut omettre des comportements actuels non caractérisés. | ADR-0002 : couverture automatisée faible face au périmètre existant | Caractérisation du golden path | Open |
+| KI-009 | High | Bridge | Aucun corpus de traces SimConnect rejouables n'est fourni pour prouver la parité du moteur de vol. | T0001 et ADR-0002 | Premier vertical slice SimConnect | Open |
+| KI-010 | High | Release | Après création de données réelles dans le nouveau schéma, aucun retour vers l'ancien produit ne sera possible. | ADR-0002 : nouveau schéma sans compatibilité descendante | Phase 6 | Accepted |
 
 ## Règles
 
@@ -29,4 +32,3 @@ Statut : `Open`, `Accepted`, `Scheduled`, `Resolved`, `Invalid`.
 - Lier à un ticket lorsqu'il devient planifié.
 - Ne pas résoudre discrètement un problème hors scope.
 - Retirer une entrée uniquement si son historique reste traçable dans un ticket.
-

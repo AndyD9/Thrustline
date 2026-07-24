@@ -8,18 +8,23 @@ détails d'exécution appartiennent aux tickets.
 Objectif : rendre l'existant mesurable et décider ce que l'on reconstruit.
 
 - Inventaire reproductible, tests/builds et matrice de dépendances.
-- Décision solo connecté vs VA collaborative.
+- Décision du modèle produit : MVP solo connecté préparé pour une collaboration
+  ultérieure (`ADR-0001`, acceptée).
 - Matrice Windows/MSFS supportée.
 - Budgets stabilité/performance et politique de données.
-- Choix : réécriture incrémentale ou remplacement par strangler pattern.
+- Stratégie acceptée : réécriture totale isolée dans un nouveau dépôt
+  (`ADR-0002`), sans migration des données de développement.
 - Environnements dev/staging/prod documentés.
 
-Gate : baseline verte ou écarts connus, ADR majeures acceptées, périmètre MVP gelé.
+Gate : baseline verte ou écarts connus, ADR majeures acceptées, périmètre MVP
+gelé et golden path à caractériser identifié.
 
 ## Phase 1 — Socle reproductible
 
-Objectif : pouvoir reconstruire et tester le produit à tout moment.
+Objectif : créer dans le nouveau dépôt un socle reconstruisible et testable à
+tout moment.
 
+- Nouveau dépôt, historique neuf, règles de branches courtes et CI obligatoire.
 - Versions/outils supportés et bootstrap automatisé.
 - Source de version unique.
 - CI consolidée et actions épinglées.
@@ -37,7 +42,7 @@ Objectif : empêcher corruption, doubles opérations et calculs client autoritai
 - Commandes transactionnelles/idempotentes.
 - RLS A/B/anonyme.
 - Concurrence optimiste et audit.
-- Migration/reconciliation des données existantes.
+- Nouveau schéma créé depuis zéro avec seeds synthétiques et restauration testée.
 
 Gate : aucune mutation sensible directe depuis un composant client.
 
@@ -45,13 +50,14 @@ Gate : aucune mutation sensible directe depuis un composant client.
 
 Objectif : rendre la détection de vol déterministe et récupérable.
 
+- Premier vertical slice critique de la réécriture.
 - Domaine indépendant de SimConnect.
 - Replays de traces et projet de tests .NET.
 - Reconnexion, pause, slew, go-around, touch-and-go et crash.
 - Canal local durci et cycle de vie robuste.
 - Rapport de vol versionné et outbox de reprise.
 
-Gate : parcours critiques reproductibles sans lancer MSFS.
+Gate : traces représentatives rejouées sans MSFS jusqu'à un rapport versionné.
 
 ## Phase 4 — Application cliente maintenable
 
@@ -64,7 +70,8 @@ Objectif : reconstruire l'UX sur des fondations testables.
 - États offline/pending/rejected explicites.
 - Accessibilité et design system.
 
-Gate : golden path E2E stable et aucun écran critique monolithique.
+Gate : golden path E2E auth → compagnie → flotte → dispatch → vol → rapport →
+grand livre stable et aucun écran critique monolithique.
 
 ## Phase 5 — Opérations passives et progression
 
@@ -100,11 +107,18 @@ Objectif : mesurer en conditions réelles sans ajouter de fonctionnalités.
 
 Gate : deux releases consécutives respectent les objectifs de stabilité.
 
+## Bascule et archivage de l'ancien dépôt
+
+Il n'y a qu'une bascule publique, après validation des gates de caractérisation,
+socle, SimConnect, parité du golden path, recréation/restauration des données et
+distribution signée. L'ancien client n'accède jamais au nouveau backend. Le dépôt
+actuel est archivé seulement après acceptation de cette parité par Andy.
+
 ## Phase 8 — Après stabilité
 
-- Collaboration multi-rôle si décidée.
+- Nouvelle ADR puis collaboration multi-rôle si le besoin probable est confirmé ;
+  aucun parcours collaboratif ne fait partie du MVP.
 - Tableau de bord web.
 - Import/export avancé.
 - Administration et audit étendu.
 - Modding avec permissions/signatures dédiées.
-

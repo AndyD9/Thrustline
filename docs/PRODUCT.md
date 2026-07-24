@@ -23,15 +23,22 @@ compagnie sans perdre les données ni pouvoir falsifier facilement son économie
 Un passionné de simulation qui gère sa propre compagnie et effectue lui-même des
 vols dans MSFS.
 
-## Décision produit requise
+## Modèle produit retenu
 
-Avant le schéma final, choisir explicitement :
+Le MVP est **solo connecté, préparé pour une collaboration ultérieure**,
+conformément à `ADR-0001`.
 
-- **Solo connecté** : une compagnie appartient à un utilisateur ;
-- **VA collaborative** : plusieurs membres, rôles, invitations et pilotes.
+- Un utilisateur possède au plus une compagnie.
+- Une compagnie a exactement un propriétaire humain.
+- Le propriétaire est le seul à voir et gérer les vols, finances, flotte et
+  horaires de sa compagnie.
+- Aucun membre, rôle supplémentaire, invitation, partage ou transfert de
+  propriété n'est livré dans le MVP.
+- L'identité de la compagnie reste distincte de celle du propriétaire afin de ne
+  pas bloquer une évolution future.
 
-La phase de fondation part du mode solo tant qu'une ADR n'adopte pas le mode
-collaboratif. Ne pas ajouter partiellement du multi-utilisateur.
+La collaboration est probable après le MVP, mais elle nécessitera une nouvelle
+ADR. Ne pas ajouter partiellement du multi-utilisateur.
 
 ## Parcours essentiels
 
@@ -60,6 +67,9 @@ collaboratif. Ne pas ajouter partiellement du multi-utilisateur.
 ## Hors MVP
 
 - Réseau social, marketplace communautaire et mods.
+- Membres de compagnie, rôles collaboratifs, invitations et transfert de
+  propriété.
+- Vols, finances, flotte ou horaires partagés entre plusieurs humains.
 - Application mobile.
 - Tableau de bord web public.
 - Multi-VA complexe.
@@ -82,4 +92,3 @@ collaboratif. Ne pas ajouter partiellement du multi-utilisateur.
 - Reprise après coupure testée sur chaque parcours essentiel.
 - Temps de démarrage et consommation mémoire budgétés.
 - Mise à jour N-1 → N et rollback validés sur VM propre.
-

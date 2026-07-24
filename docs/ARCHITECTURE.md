@@ -61,11 +61,28 @@ Supabase
 ### Supabase
 
 - Identité et autorisation.
+- Ownership MVP limité côté serveur à un propriétaire par compagnie et au plus
+  une compagnie par utilisateur.
+- Identité de compagnie distincte de l'identité utilisateur, sans droit
+  collaboratif implicite.
 - Commandes sensibles transactionnelles et idempotentes.
 - Grand livre immuable et projections.
 - RLS défensive sur chaque table exposée.
 - Audit des changements sensibles.
 - Traitements passifs côté serveur, indépendants d'un client ouvert.
+
+## Stratégie de construction
+
+Conformément à `ADR-0002`, l'architecture cible sera construite par réécriture
+totale dans un nouveau dépôt et un historique Git neuf. Le dépôt actuel reste une
+référence en lecture seule pour les comportements, l'UX et la documentation
+jusqu'à validation de la parité du golden path, puis il est archivé.
+
+Il n'existe aucune coexistence en production, aucune double lecture/écriture et
+aucune compatibilité avec l'ancien schéma. Le nouveau dépôt utilise des branches
+courtes, une intégration fréquente et une CI obligatoire. Le premier vertical
+slice critique est le moteur de vol SimConnect rejouable jusqu'au rapport
+versionné.
 
 ## Organisation cible
 
@@ -100,8 +117,10 @@ docs/
   templates/
 ```
 
-La migration vers cette organisation est progressive et pilotée par tickets.
-Aucun « big bang » de déplacement sans tests de caractérisation.
+Cette organisation appartient au nouveau dépôt. Aucun code n'y est déplacé
+depuis le dépôt actuel sans ticket de caractérisation et preuve de qualité,
+sécurité, provenance et licence. La réécriture reste pilotée par gates et tests
+de caractérisation malgré l'absence de migration de code.
 
 ## Données
 
@@ -130,9 +149,16 @@ Aucun « big bang » de déplacement sans tests de caractérisation.
 
 ## Décisions encore ouvertes
 
-- Solo connecté ou VA collaborative.
 - HTTP localhost renforcé ou named pipe Windows pour le bridge.
 - Cache SQLite local et données autorisées hors ligne.
 - Stratégie d'anti-triche proportionnée.
 - Fournisseur de crash reporting et consentement.
 
+## Décisions acceptées
+
+- `ADR-0001` : MVP solo connecté, un propriétaire unique et au plus une
+  compagnie par utilisateur ; modèle préparé pour une collaboration ultérieure,
+  sans membre ni rôle collaboratif dans le MVP.
+- `ADR-0002` : réécriture totale isolée dans un nouveau dépôt ; ancien dépôt
+  conservé comme référence en lecture seule, nouveau schéma sans migration des
+  données de développement et une seule bascule publique après parité.
