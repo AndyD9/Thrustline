@@ -1,6 +1,6 @@
 # État actuel du dépôt
 
-Dernière revue documentaire : 24 juillet 2026 (ticket T0002).  
+Dernière revue documentaire : 24 juillet 2026 (ticket T0003).
 Statut : baseline locale vérifiée ; validations externes encore requises.
 
 ## Produit
@@ -157,10 +157,22 @@ ultérieure : au plus une compagnie par utilisateur, un propriétaire humain
 unique, aucun membre ni rôle collaboratif dans le MVP. La collaboration probable
 après le MVP exigera une nouvelle ADR.
 
+## Décision de refonte
+
+`ADR-0002` retient une réécriture totale isolée dans un nouveau dépôt avec un
+historique Git neuf. Le dépôt actuel devient une référence en lecture seule pour
+l'UX, les comportements et la documentation jusqu'à parité du golden path, puis
+il sera archivé. Le nouveau produit utilise un schéma Supabase neuf : les données
+actuelles sont uniquement des données de développement et ne seront pas migrées.
+Il n'y aura ni coexistence en production, ni double écriture, ni ancien client
+connecté au nouveau backend. Une seule bascule publique est prévue après les
+gates de caractérisation, SimConnect, parité, restauration et distribution.
+
 ## Prochain ticket recommandé
 
-`T0003 — Choisir la stratégie de refonte`. La décision produit nécessaire est
-désormais acceptée. La matrice Windows/MSFS reste planifiée dans T0004.
+Créer et exécuter un ticket borné de caractérisation du golden path et des traces
+SimConnect avant le nouveau socle. La matrice Windows/MSFS reste planifiée dans
+T0004.
 
 ## Mise à jour de ce fichier
 
