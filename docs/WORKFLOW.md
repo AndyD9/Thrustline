@@ -79,8 +79,61 @@ la faire et sur quel environnement ; le ticket reste `Verify`.
 2. Actualiser `CURRENT_STATE.md` si l'état réel a changé.
 3. Ajouter les problèmes différés dans `KNOWN_ISSUES.md`.
 4. Mettre à jour une ADR seulement par une nouvelle ADR qui la remplace.
-5. Fusionner après checks et revue.
-6. Choisir le prochain ticket Ready.
+5. Préparer le handoff Git avec les fichiers exacts du ticket.
+6. Faire relire à Andy le diff indexé avant commit.
+7. Fusionner après checks et revue.
+8. Choisir le prochain ticket Ready.
+
+## Handoff Git de fin de ticket
+
+Codex doit terminer chaque ticket par des commandes adaptées à l'état réel du
+dépôt. Il ne doit ni pousser automatiquement, ni proposer une commande globale
+qui embarquerait des changements sans rapport.
+
+Exemple de structure à adapter :
+
+```powershell
+# À exécuter dans PowerShell Windows
+Set-Location C:\Users\andyd\Documents\Thrustline
+
+# 1. Vérifier la branche et les changements
+git branch --show-current
+git status --short
+
+# 2. Ajouter uniquement les fichiers du ticket
+git add -- path/to/file-a path/to/file-b
+
+# 3. Relire exactement ce qui sera committé
+git diff --cached --check
+git diff --cached --stat
+git diff --cached
+
+# 4. Créer le commit
+git commit -m "type(scope): description du ticket"
+
+# 5. Publier la branche
+git push -u origin nom-reel-de-la-branche
+
+# 6. Ouvrir la PR si GitHub CLI est configuré
+gh pr create --base branche-cible --head nom-reel-de-la-branche `
+  --title "TXXXX — Titre" `
+  --body-file docs/tickets/TXXXX-ticket.md
+```
+
+Avant de fournir ce bloc, Codex doit remplacer tous les exemples par les valeurs
+réelles. S'il existe des fichiers modifiés hors ticket, il doit les lister
+séparément et confirmer qu'ils ne figurent pas dans `git add`.
+
+Si GitHub demande un mot de passe HTTPS, ne pas utiliser le mot de passe du
+compte. Configurer GitHub CLI depuis PowerShell :
+
+```powershell
+gh auth login
+gh auth setup-git
+```
+
+Pour éviter les erreurs `chmod ... .git/config.lock`, ne pas utiliser Git WSL
+sur ce dépôt stocké sous `C:\Users\...`.
 
 ## Limites de taille
 
@@ -118,4 +171,3 @@ Completion Report avec preuves, risques et follow-ups.
 - quelle automatisation répétée mérite un script ou une skill ?
 
 Modifier le workflow uniquement sur la base d'un problème répété.
-

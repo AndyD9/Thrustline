@@ -170,9 +170,10 @@ gates de caractérisation, SimConnect, parité, restauration et distribution.
 
 ## Prochain ticket recommandé
 
-Créer et exécuter un ticket borné de caractérisation du golden path et des traces
-SimConnect avant le nouveau socle. La matrice Windows/MSFS reste planifiée dans
-T0004.
+`T0004 — Définir la matrice de support Windows et MSFS`. Il doit fixer les
+plateformes officielles, les niveaux de support et le protocole de validation
+SimConnect. Les replays et la caractérisation du golden path seront ensuite
+réalisés par des tickets d'implémentation bornés.
 
 ## Mise à jour de ce fichier
 

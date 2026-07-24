@@ -90,3 +90,15 @@ Comment abandonner/revenir en arrière sans perte de données.
 
 ### Documentation updated
 
+### Git handoff
+
+À remplir par Codex avec :
+
+- branche courante constatée ;
+- fichiers exacts à indexer ;
+- modifications hors ticket à préserver ;
+- message de commit proposé ;
+- commandes PowerShell de vérification, commit, push et création de PR ;
+- branche cible de la PR.
+
+Ne jamais utiliser `git add .` ou inclure un fichier hors ticket.

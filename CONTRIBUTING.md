@@ -32,6 +32,11 @@ Une PR couvre un ticket. Elle contient :
 - risques, limites et rollback ;
 - follow-ups hors périmètre.
 
+À la fin d'un ticket, Codex doit fournir les commandes Git exactes à exécuter
+depuis PowerShell Windows. Elles doivent indexer explicitement les fichiers du
+ticket, afficher le diff préparé, créer le commit, pousser la branche et proposer
+la création de PR. `git add .` et `git add -A` sont interdits dans ce handoff.
+
 ## Qualité
 
 Suivre `docs/QUALITY.md` et les validations du ticket. Ne pas masquer un test
@@ -41,4 +46,3 @@ Suivre `docs/QUALITY.md` et les validations du ticket. Ne pas masquer un test
 
 Ne jamais ouvrir une issue publique contenant une faille exploitable, un secret ou
 des données personnelles. Suivre `SECURITY.md`.
-

@@ -115,3 +115,39 @@ Un ticket n'est `Done` que si :
 Le rapport final doit donner : résumé, fichiers modifiés, commandes exécutées,
 résultats, vérification manuelle, risques, follow-ups et documentation mise à jour.
 
+## Handoff Git obligatoire
+
+À la fin de chaque ticket, fournir à Andy un bloc de commandes PowerShell prêt à
+copier pour publier le travail. Ce handoff est obligatoire même si aucun push
+n'est effectué par l'agent.
+
+Avant de construire les commandes :
+
+1. relever la branche courante avec `git branch --show-current` ;
+2. relever la branche distante par défaut ;
+3. distinguer les fichiers du ticket des modifications préexistantes ;
+4. proposer un message de commit Conventional Commits adapté ;
+5. vérifier si la branche possède déjà un upstream.
+
+Le bloc doit inclure, dans cet ordre :
+
+1. `git status --short` ;
+2. un `git add -- <liste explicite>` contenant uniquement les fichiers du ticket ;
+3. `git diff --cached --check` ;
+4. `git diff --cached --stat` ;
+5. une vérification qu'aucun fichier hors ticket n'est indexé ;
+6. `git commit -m "<message>"` ;
+7. `git push` ou `git push -u origin <branche>` selon l'upstream ;
+8. la commande `gh pr create` appropriée si une PR est attendue.
+
+Règles :
+
+- ne jamais recommander `git add .` ou `git add -A` ;
+- ne jamais inclure silencieusement une modification utilisateur préexistante ;
+- ne jamais inventer le nom de la branche ou la cible de PR : les relever ;
+- utiliser Git pour Windows/PowerShell pour ce dépôt, pas Git WSL sur `/mnt/c` ;
+- ne jamais demander le mot de passe GitHub ; recommander `gh auth login` si
+  l'authentification manque ;
+- ne pas exécuter commit, push, création de PR ou merge sans demande explicite ;
+- si le ticket n'est pas prêt à publier, expliquer le blocage au lieu de fournir
+  des commandes prétendant qu'il est terminé.
