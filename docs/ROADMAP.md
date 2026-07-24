@@ -8,7 +8,8 @@ détails d'exécution appartiennent aux tickets.
 Objectif : rendre l'existant mesurable et décider ce que l'on reconstruit.
 
 - Inventaire reproductible, tests/builds et matrice de dépendances.
-- Décision solo connecté vs VA collaborative.
+- Décision du modèle produit : MVP solo connecté préparé pour une collaboration
+  ultérieure (`ADR-0001`, acceptée).
 - Matrice Windows/MSFS supportée.
 - Budgets stabilité/performance et politique de données.
 - Choix : réécriture incrémentale ou remplacement par strangler pattern.
@@ -102,9 +103,9 @@ Gate : deux releases consécutives respectent les objectifs de stabilité.
 
 ## Phase 8 — Après stabilité
 
-- Collaboration multi-rôle si décidée.
+- Nouvelle ADR puis collaboration multi-rôle si le besoin probable est confirmé ;
+  aucun parcours collaboratif ne fait partie du MVP.
 - Tableau de bord web.
 - Import/export avancé.
 - Administration et audit étendu.
 - Modding avec permissions/signatures dédiées.
-

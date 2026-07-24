@@ -61,6 +61,10 @@ Supabase
 ### Supabase
 
 - Identité et autorisation.
+- Ownership MVP limité côté serveur à un propriétaire par compagnie et au plus
+  une compagnie par utilisateur.
+- Identité de compagnie distincte de l'identité utilisateur, sans droit
+  collaboratif implicite.
 - Commandes sensibles transactionnelles et idempotentes.
 - Grand livre immuable et projections.
 - RLS défensive sur chaque table exposée.
@@ -130,9 +134,13 @@ Aucun « big bang » de déplacement sans tests de caractérisation.
 
 ## Décisions encore ouvertes
 
-- Solo connecté ou VA collaborative.
 - HTTP localhost renforcé ou named pipe Windows pour le bridge.
 - Cache SQLite local et données autorisées hors ligne.
 - Stratégie d'anti-triche proportionnée.
 - Fournisseur de crash reporting et consentement.
 
+## Décisions acceptées
+
+- `ADR-0001` : MVP solo connecté, un propriétaire unique et au plus une
+  compagnie par utilisateur ; modèle préparé pour une collaboration ultérieure,
+  sans membre ni rôle collaboratif dans le MVP.

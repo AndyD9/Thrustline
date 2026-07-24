@@ -15,14 +15,13 @@ Créer un fichier par ticket à partir de `docs/templates/TICKET.md`.
 | ID | Titre | Phase | Dépend de | Statut |
 | --- | --- | --- | --- | --- |
 | T0001 | Baseline reproductible et inventaire | 0 | — | Done |
-| T0002 | Choisir le modèle produit solo ou collaboratif | 0 | T0001 | Ready |
-| T0003 | ADR stratégie de refonte | 0 | T0001–T0002 | Draft |
+| T0002 | Choisir le modèle produit solo ou collaboratif | 0 | T0001 | Done |
+| T0003 | Choisir la stratégie de refonte | 0 | T0001–T0002 | Ready |
 | T0004 | Matrice de support Windows/MSFS | 0 | T0001 | Draft |
 | T0005 | Budgets stabilité et performance | 0 | T0001 | Draft |
 | T0006 | Consolider CI et versions d'outils | 1 | T0003 | Backlog |
 | T0007 | Supabase local et tests RLS | 1 | T0003 | Backlog |
 | T0008 | Source de version unique | 1 | T0003 | Backlog |
 
-T0002 est le prochain ticket exécutable. Les tickets suivants doivent être
-affinés après sa décision pour éviter de figer une architecture fondée sur une
-hypothèse produit.
+T0003 est le prochain ticket exécutable. Il tient compte d'ADR-0001 et doit être
+terminé avant la création du nouveau socle ou toute migration de données.

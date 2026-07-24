@@ -1,6 +1,6 @@
 # État actuel du dépôt
 
-Dernière revue documentaire : 24 juillet 2026 (ticket T0001).  
+Dernière revue documentaire : 24 juillet 2026 (ticket T0002).  
 Statut : baseline locale vérifiée ; validations externes encore requises.
 
 ## Produit
@@ -139,7 +139,8 @@ explicite. Ces échecs sont classés comme environnement, pas comme défauts du 
   atomiques.
 - Pas de pipeline complet de release signée/updater.
 - Versions répétées dans plusieurs manifestes.
-- Modèle solo ou VA collaborative non tranché.
+- Politique de suppression/récupération du propriétaire et durée de rétention à
+  définir avant toute suppression irréversible.
 
 ## Travail local à préserver
 
@@ -149,11 +150,17 @@ pendant T0001. Son empreinte SHA-256 avant et après validation est
 Les autres modifications utilisateur préexistantes n'ont pas été intégrées au
 ticket.
 
+## Décision produit
+
+`ADR-0001` retient un MVP solo connecté préparé pour une collaboration
+ultérieure : au plus une compagnie par utilisateur, un propriétaire humain
+unique, aucun membre ni rôle collaboratif dans le MVP. La collaboration probable
+après le MVP exigera une nouvelle ADR.
+
 ## Prochain ticket recommandé
 
-`T0002 — Choisir le modèle produit solo ou collaboratif`. Cette décision précède
-le schéma cible, les rôles, les politiques RLS et la stratégie de refonte. La
-matrice Windows/MSFS sera traitée ensuite dans T0004.
+`T0003 — Choisir la stratégie de refonte`. La décision produit nécessaire est
+désormais acceptée. La matrice Windows/MSFS reste planifiée dans T0004.
 
 ## Mise à jour de ce fichier
 
