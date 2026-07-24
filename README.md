@@ -145,9 +145,14 @@ npm run tauri:build
 
 ## Documentation du projet
 
-- [`PLAN.md`](PLAN.md) : feuille de route et comportement cible
-- [`PROGRESS.md`](PROGRESS.md) : etat d'avancement et fonctionnalites livrees
-- [`codex.md`](codex.md) : architecture detaillee et conventions de contribution
+- [`docs/README.md`](docs/README.md) : point d'entree de la refonte
+- [`docs/PRODUCT.md`](docs/PRODUCT.md) : vision et perimetre produit
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) : architecture cible
+- [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) : etat reel du depot
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) : phases et gates de la refonte
+- [`docs/WORKFLOW.md`](docs/WORKFLOW.md) : cycle de travail par tickets
+- [`docs/tickets/`](docs/tickets/) : backlog et rapports de completion
+- [`AGENTS.md`](AGENTS.md) : regles obligatoires pour les agents
 - [`supabase/README.md`](supabase/README.md) : notes relatives a Supabase
 
 ## Securite
