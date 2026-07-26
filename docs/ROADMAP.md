@@ -12,7 +12,9 @@ Objectif : rendre l'existant mesurable et décider ce que l'on reconstruit.
   ultérieure (`ADR-0001`, acceptée).
 - Matrice Windows/MSFS acceptée (`ADR-0003`) : Windows 11 x64 et MSFS 2024
   stable, Store et Steam prouvés séparément.
-- Budgets stabilité/performance et politique de données.
+- Stack cible acceptée (`ADR-0004`) : Tauri/WebView2, React, .NET 10,
+  SimConnect officiel abstrait et Supabase/PostgreSQL 17.
+- Budgets stabilité/performance (`T0015`) et politique de données.
 - Stratégie acceptée : réécriture totale isolée dans un nouveau dépôt
   (`ADR-0002`), sans migration des données de développement.
 - Environnements dev/staging/prod documentés.
@@ -28,7 +30,7 @@ Objectif : créer dans le nouveau dépôt un socle reconstruisible et testable �
 tout moment.
 
 - Nouveau dépôt, historique neuf, règles de branches courtes et CI obligatoire.
-- Versions/outils supportés et bootstrap automatisé.
+- Versions/outils supportés selon `docs/STACK.md` et bootstrap automatisé.
 - Source de version unique.
 - CI consolidée et actions épinglées.
 - Lint/format/types/tests cohérents.

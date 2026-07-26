@@ -180,11 +180,25 @@ Une machine Ryzen 7 5800X, 32 Go et RX 6070 XT est disponible comme profil
 recommandé de validation. Elle ne prouve pas le minimum matériel. Aucun test
 MSFS réel n'a été exécuté dans T0004.
 
+## Décision de stack cible
+
+`ADR-0004` retient Node 24 LTS avec pnpm 11, React 19/Vite 8, Tauri 2.11 sur
+WebView2 Evergreen, Rust stable épinglé, un bridge .NET 10 LTS self-contained
+`win-x64`, le SDK SimConnect officiel derrière une abstraction interne, et
+Supabase/PostgreSQL 17. Firebase, Electron et le wrapper `SimConnect.NET` ne sont
+pas les fondations de la refonte.
+
+Cette décision est documentaire : aucune version n'a été installée et aucun
+manifest, lockfile, workflow ou code applicatif n'a été modifié. Les performances
+et la compatibilité self-contained SimConnect restent à prouver par les tickets
+d'adoption.
+
 ## Prochain ticket recommandé
 
-`T0005 — Budgets stabilité et performance`. Il doit mesurer et fixer les budgets
-du profil minimum/recommandé. Les preuves Store/Steam et les replays SimConnect
-seront réalisés lors du premier vertical slice bridge.
+`T0006 — Épingler les runtimes et créer la source de versions`. Il doit créer
+dans le nouveau dépôt les pins Node/pnpm/Rust/.NET/PowerShell, le bootstrap et
+les contrôles de dérive, sans introduire encore le shell ou le frontend. Les
+budgets du profil minimum/recommandé sont renumérotés `T0015`.
 
 ## Mise à jour de ce fichier
 

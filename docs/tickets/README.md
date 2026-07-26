@@ -18,11 +18,18 @@ Créer un fichier par ticket à partir de `docs/templates/TICKET.md`.
 | T0002 | Choisir le modèle produit solo ou collaboratif | 0 | T0001 | Done |
 | T0003 | Choisir la stratégie de refonte | 0 | T0001–T0002 | Done |
 | T0004 | Définir la matrice de support Windows et MSFS | 0 | T0001–T0003 | Done |
-| T0005 | Budgets stabilité et performance | 0 | T0001 | Draft |
-| T0006 | Consolider CI et versions d'outils | 1 | T0003 | Backlog |
-| T0007 | Supabase local et tests RLS | 1 | T0003 | Backlog |
-| T0008 | Source de version unique | 1 | T0003 | Backlog |
+| T0005 | Sélectionner la stack cible et ses versions compatibles | 0 | T0001–T0004 | Verify |
+| T0006 | Épingler les runtimes et créer la source de versions | 1 | T0005 | Backlog |
+| T0007 | Créer le shell Tauri minimal et mesurer son empreinte | 1 | T0006 | Backlog |
+| T0008 | Créer le frontend React minimal | 1 | T0006–T0007 | Backlog |
+| T0009 | Créer le bridge .NET minimal | 1 | T0006 | Backlog |
+| T0010 | Établir le contrat local et le health check | 1 | T0007–T0009 | Backlog |
+| T0011 | Créer l'adaptateur SimConnect et le replay | 1–3 | T0009–T0010 | Backlog |
+| T0012 | Créer Supabase local et les tests RLS | 1 | T0006 | Backlog |
+| T0013 | Consolider la CI multi-stack | 1 | T0006–T0012 | Backlog |
+| T0014 | Valider le packaging Windows non signé | 1 | T0007–T0013 | Backlog |
+| T0015 | Fixer les budgets stabilité et performance | 0–1 | T0007–T0011 | Backlog |
 
-T0005 est le prochain ticket exécutable. Les premières preuves réelles Store et
-Steam seront capturées avec le vertical slice SimConnect, avant toute promotion
-vers `Supported`.
+T0005 attend la vérification humaine de la matrice et des sources. Après
+acceptation, T0006 est le prochain ticket exécutable. Les tickets détaillés sont
+créés par lots de 3 à 8 selon `WORKFLOW.md`.

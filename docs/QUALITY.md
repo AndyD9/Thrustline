@@ -55,6 +55,9 @@ résultat.
 
 ## Budgets initiaux à fixer en phase 0
 
+Ticket cible : `T0015 — Fixer les budgets stabilité et performance`. T0005
+choisit la stack mais ne remplace aucune mesure sur le profil matériel cible.
+
 - temps de démarrage sur machine cible ;
 - mémoire au repos et pendant un vol long ;
 - fréquence maximale de rendu de télémétrie ;
@@ -62,6 +65,15 @@ résultat.
 - latence des commandes critiques ;
 - sessions sans crash ;
 - temps maximum de récupération après déconnexion.
+
+## Validation des mises à niveau
+
+- Correctif : tests ciblés, audits et builds de tous les consommateurs.
+- Mineure : contrôles précédents et smoke test du groupe de compatibilité.
+- Majeure : ADR légère, fenêtre de test de deux semaines, matrice complète et
+  rollback vers les lockfiles précédents.
+- Le socle mesure démarrage, mémoire, CPU, taille et reprise avant de promouvoir
+  un shell, un runtime ou une optimisation (trimming, ReadyToRun, Native AOT).
 
 ## Vérification manuelle d'un ticket
 

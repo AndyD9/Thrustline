@@ -8,17 +8,17 @@ Statut : cible de refonte ; toute divergence durable nécessite un ADR.
 MSFS
   │ SimConnect (données non fiables)
   ▼
-Bridge .NET 8
+Bridge .NET 10 LTS
   │ événements de vol versionnés
   │ canal local authentifié
   ▼
-Tauri v2 / Rust
+Tauri 2.11 / Rust stable épinglé
   │ capacités natives minimales
   ▼
-React / TypeScript
+React 19 / TypeScript 6
   │ lectures RLS + commandes HTTPS
   ▼
-Supabase
+Supabase / PostgreSQL 17
   ├─ Auth
   ├─ PostgreSQL + RLS
   ├─ RPC/Edge Functions transactionnelles
@@ -54,6 +54,8 @@ Supabase
 
 - Connexion/reconnexion SimConnect.
 - Client hors processus self-contained Windows x64, limité à la session locale.
+- SDK/API SimConnect officiel MSFS 2024 isolé derrière `ISimConnectAdapter` ;
+  aucun type SDK dans le domaine et aucune dépendance du domaine au wrapper.
 - Normalisation, validation et agrégation de la télémétrie.
 - Machine à états de vol déterministe et rejouable.
 - Rapport de vol versionné.
@@ -71,6 +73,10 @@ Supabase
 - RLS défensive sur chaque table exposée.
 - Audit des changements sensibles.
 - Traitements passifs côté serveur, indépendants d'un client ouvert.
+- PostgreSQL 17 fourni par la plateforme ; migrations et types générés depuis
+  le schéma neuf.
+- RPC SQL préférée pour les commandes purement transactionnelles ; Edge
+  Functions réservées à l'orchestration réseau ou aux secrets serveur.
 
 ## Stratégie de construction
 
@@ -166,3 +172,6 @@ de caractérisation malgré l'absence de migration de code.
 - `ADR-0003` : Windows 11 x64 maintenu et MSFS 2024 stable uniquement ; Store et
   Steam sont validés séparément, sans support Windows 10, ARM64, MSFS 2020,
   Insider ou Preview. WebView2 Evergreen et bridge .NET self-contained.
+- `ADR-0004` : Node 24/pnpm 11/React 19/Tauri 2.11, bridge .NET 10 LTS avec SDK
+  SimConnect officiel abstrait et backend Supabase/PostgreSQL 17. Les versions
+  exactes et la politique mensuelle sont dans `docs/STACK.md`.
