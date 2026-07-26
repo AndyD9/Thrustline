@@ -70,11 +70,18 @@ Supposer qu'un attaquant peut :
 ### Supply chain et release
 
 - Lockfiles, audits npm/NuGet/Rust, scan de secrets et licences.
+- Versions directes exactes ; restauration CI en mode verrouillé.
+- Scripts d'installation pnpm refusés sauf allowlist et paquets nouveaux
+  différés de sept jours, hors correctif urgent revu.
 - Actions CI épinglées à des SHA immuables.
 - Secrets CI interdits aux PR de forks.
 - EXE, installateur et manifeste de mise à jour signés.
 - Checksum, SBOM et provenance publiés.
 - Vulnérabilité critique/haute bloque la release sauf exception écrite et limitée.
+- Dépendance critique abandonnée ou sans licence claire refusée ; toute
+  exception nomme une alternative et expire sous 90 jours.
+- Build, signature et publication sont trois étapes séparées ; aucun secret de
+  signature n'est exposé au job de build ni aux PR externes.
 
 ## Revue sécurité d'un ticket
 
@@ -97,4 +104,3 @@ Tout ticket touchant auth, DB, fichiers, réseau, IPC, shell, update, télémét
 4. Préparer une release signée.
 5. Informer les utilisateurs affectés si nécessaire.
 6. Consigner l'incident et l'action préventive.
-
