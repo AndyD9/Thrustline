@@ -168,11 +168,23 @@ Il n'y aura ni coexistence en production, ni double écriture, ni ancien client
 connecté au nouveau backend. Une seule bascule publique est prévue après les
 gates de caractérisation, SimConnect, parité, restauration et distribution.
 
+## Décision de support
+
+`ADR-0003` retient Windows 11 x64, sur une version publique encore maintenue par
+Microsoft, et MSFS 2024 stable uniquement. Microsoft Store/Xbox App et Steam sont
+deux combinaisons distinctes qui restent `Unsupported — validation requise`
+jusqu'à une fiche de test réelle par canal. Windows 10, ARM64, MSFS 2020,
+Windows Insider et les builds MSFS Beta/Preview sont `Unsupported`.
+
+Une machine Ryzen 7 5800X, 32 Go et RX 6070 XT est disponible comme profil
+recommandé de validation. Elle ne prouve pas le minimum matériel. Aucun test
+MSFS réel n'a été exécuté dans T0004.
+
 ## Prochain ticket recommandé
 
-Créer et exécuter un ticket borné de caractérisation du golden path et des traces
-SimConnect avant le nouveau socle. La matrice Windows/MSFS reste planifiée dans
-T0004.
+`T0005 — Budgets stabilité et performance`. Il doit mesurer et fixer les budgets
+du profil minimum/recommandé. Les preuves Store/Steam et les replays SimConnect
+seront réalisés lors du premier vertical slice bridge.
 
 ## Mise à jour de ce fichier
 

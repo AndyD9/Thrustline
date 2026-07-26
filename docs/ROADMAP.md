@@ -10,14 +10,17 @@ Objectif : rendre l'existant mesurable et décider ce que l'on reconstruit.
 - Inventaire reproductible, tests/builds et matrice de dépendances.
 - Décision du modèle produit : MVP solo connecté préparé pour une collaboration
   ultérieure (`ADR-0001`, acceptée).
-- Matrice Windows/MSFS supportée.
+- Matrice Windows/MSFS acceptée (`ADR-0003`) : Windows 11 x64 et MSFS 2024
+  stable, Store et Steam prouvés séparément.
 - Budgets stabilité/performance et politique de données.
 - Stratégie acceptée : réécriture totale isolée dans un nouveau dépôt
   (`ADR-0002`), sans migration des données de développement.
 - Environnements dev/staging/prod documentés.
 
 Gate : baseline verte ou écarts connus, ADR majeures acceptées, périmètre MVP
-gelé et golden path à caractériser identifié.
+gelé, golden path à caractériser identifié et protocole de preuve plateforme
+défini. La promotion effective d'un canal MSFS vers `Supported` peut intervenir
+avec les tests réels du vertical slice.
 
 ## Phase 1 — Socle reproductible
 
@@ -92,7 +95,7 @@ Objectif : produire une bêta installable et récupérable.
 - Updater signé, canaux stable/bêta et rollback.
 - Logs redigés, diagnostics consentis et crash reporting.
 - Politique sécurité, confidentialité, licence et support.
-- Tests VM Windows/MSFS.
+- Tests Windows 11 x64/MSFS 2024 sur Store et Steam, avec fiches ADR-0003.
 
 Gate : installation, upgrade N-1, rollback et désinstallation validés.
 

@@ -78,8 +78,11 @@ ADR. Ne pas ajouter partiellement du multi-utilisateur.
 
 ## Contraintes de distribution
 
-- Windows 10/11 à confirmer par matrice de tests.
-- MSFS 2020/2024 et éditions réellement supportées à documenter.
+- Windows 11 x64 uniquement, version publique encore maintenue par Microsoft.
+- MSFS 2024 stable uniquement ; Microsoft Store/Xbox App et Steam sont deux
+  combinaisons distinctes à prouver avant toute déclaration `Supported`.
+- Windows 10, ARM64, MSFS 2020, Windows Insider et MSFS Beta/Preview sont exclus
+  conformément à `ADR-0003`.
 - Aucun privilège administrateur permanent.
 - Données utilisateur séparées des fichiers d'installation.
 - Politique de confidentialité, support, sécurité et licence avant bêta publique.
