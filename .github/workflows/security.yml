@@ -53,7 +53,7 @@ jobs:
         with:
           working-directory: app/src-tauri
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
       - name: Repository security invariants
         shell: pwsh
         run: ./scripts/security-check.ps1
