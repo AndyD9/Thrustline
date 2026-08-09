@@ -21,7 +21,7 @@
   "dependencies": {
     "@microsoft/signalr": "^8.0.7",
     "@supabase/supabase-js": "^2.45.4",
-    "@tauri-apps/api": "^2.0.3",
+    "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-shell": "^2.0.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.7.0",
