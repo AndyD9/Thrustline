@@ -92,7 +92,7 @@ A question listed here is a legitimate reason for a unit to sit in `Draft`.
 | Question | Blocks | Asked on |
 | --- | --- | --- |
 | Which capabilities are genuinely shipped and merged, and by what evidence? Nothing user-facing is currently proven. | `CURRENT_STATE.md`, every unit that assumes a working baseline | 2026-08-12 |
-| Does the hardening happen in this repository, or in a new one seeded from this codebase? The owner is undecided. | repository strategy, ADR-0005 | 2026-08-12 |
+| Does the hardened codebase later move to a fresh repository? ADR-0005 leaves this deliberately open; it blocks no unit. | nothing — answer before any distribution unit | 2026-08-12 |
 | Which of the four manifests is the single source of the version number? | the version reset to `0.0.1-alpha` | 2026-08-12 |
 | What is the account-deletion and data-retention policy? No irreversible deletion may be implemented before it exists. | any account-deletion unit | ADR-0001, 2026-07-24 |
 | Which MSFS 2024 channel — Microsoft Store or Steam — gets validated first? Only one machine is available, and a proof on one channel does not carry to the other. | `KI-011`, the SimConnect slice | ADR-0003, 2026-07-26 |

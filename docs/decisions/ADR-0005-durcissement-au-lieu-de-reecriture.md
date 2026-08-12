@@ -1,7 +1,7 @@
 # ADR-0005 — Harden the existing application instead of rewriting it
 
 Date: 2026-08-12
-Status: Proposed — awaiting acceptance by PacoRCS
+Status: Accepted — PacoRCS, 2026-08-12
 Decider: PacoRCS
 Supersedes: ADR-0002
 

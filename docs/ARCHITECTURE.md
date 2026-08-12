@@ -79,6 +79,9 @@ key.
 
 A unit may not quietly undo these. Changing one requires a superseding ADR.
 
+- Harden in place, never rewrite: every existing feature is preserved, and
+  improvement happens boundary by boundary as bounded units — ADR-0005,
+  superseding ADR-0002.
 - Solo ownership: one account owns at most one company and is its only human;
   `owner` is the only role — ADR-0001.
 - Windows 11 x64 + MSFS 2024 only; no Windows 10, ARM64, MSFS 2020, or
@@ -91,11 +94,6 @@ A unit may not quietly undo these. Changing one requires a superseding ADR.
 
 Where the real structure disagrees with the documents above.
 
-- **ADR-0002 is contradicted by reality and by the owner's current decision.**
-  It mandates a full rewrite in a new repository with fresh history; this is the
-  original repository with `legacy/` carved out in place by `fc3316d`, and the
-  owner has since chosen to harden the existing code rather than rewrite it.
-  Superseded by ADR-0005 (proposed) — `KI-016`.
 - **ADR-0004 pins a stack the repository does not have**: .NET 10, pnpm 11,
   TypeScript 6, React 19, Tauri 2.11, `rust-toolchain.toml`. Actual: `net8.0`,
   npm, TypeScript 5.9, React 18.3, no `rust-toolchain.toml` — `KI-017`.

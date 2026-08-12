@@ -19,8 +19,8 @@ are not years behind. Reached when the code has been hardened boundary by
 boundary without a single user-visible feature being lost. `PacoRCS` decides
 that it is reached.
 
-This replaces the full-rewrite direction of ADR-0002. That reversal needs
-ADR-0005 before any unit relies on it.
+This replaces the full-rewrite direction of ADR-0002, superseded by ADR-0005
+(accepted 2026-08-12).
 
 ## Capabilities shipped in `main`
 
@@ -50,30 +50,29 @@ None. POSEIDON was bootstrapped on 2026-08-12; no unit has been opened yet.
 
 ## Missing for the current milestone
 
-1. **ADR-0005** superseding ADR-0002 — the rewrite decision is reversed but not
-   recorded. Everything below inherits from it.
-2. **The capability inventory** — which features are real, and how each is
+1. **The capability inventory** — which features are real, and how each is
    demonstrated. Without it "keep every feature" has no referent.
-3. **A version reset** to `0.0.1-alpha` across the four manifests, and a
+2. **A version reset** to `0.0.1-alpha` across the four manifests, and a
    decision on which one is the single source.
-4. **A dependency upgrade pass** — 19 direct dependencies are outdated, 8 by a
+3. **A dependency upgrade pass** — 19 direct dependencies are outdated, 8 by a
    major version.
-5. **A .NET test project**, so `dotnet test` stops exiting `0` on nothing.
-6. **An RLS isolation suite** for owner A / owner B / anonymous.
-7. **python3**, to take the method checks out of agent mode.
+4. **A .NET test project**, so `dotnet test` stops exiting `0` on nothing.
+5. **An RLS isolation suite** for owner A / owner B / anonymous.
+6. **python3**, to take the method checks out of agent mode.
 
 ## Outside the milestone, tracked elsewhere
 
-Nineteen entries in `docs/KNOWN_ISSUES.md`, including the three contradictions
-between the accepted ADRs and reality (`KI-016`, `KI-017`) and the absent
-release pipeline (`KI-003`). Historical tickets T0001–T0005 and the superseded
+Nineteen entries in `docs/KNOWN_ISSUES.md`. `KI-008` and `KI-016` closed with
+ADR-0005; the stack drift (`KI-017`) and the absent release pipeline (`KI-003`)
+remain open. Historical tickets T0001–T0005 and the superseded
 documentation set are in `docs/archive/`; they are context, never law.
 
 ## Steering
 
 - **Keep the application, harden the code — `PacoRCS`, 2026-08-12.** No rewrite.
   Every existing feature is preserved; the work is best practices, smaller
-  files, reliability and security. Reverses ADR-0002; pending ADR-0005.
+  files, reliability and security. Recorded as ADR-0005, accepted 2026-08-12,
+  superseding ADR-0002.
 - **Reliability and security win arbitrations — `PacoRCS`, 2026-08-12.** Where
   one option is more reliable and more secure, take it, including for runtime
   and dependency versions.

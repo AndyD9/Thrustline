@@ -18,10 +18,10 @@ agents réouvrent sans cesse une question ou suivent une règle devenue obsolèt
 | ADR | Sujet | Statut |
 | --- | --- | --- |
 | ADR-0001 | Modèle produit solo | Accepted |
-| ADR-0002 | Stratégie de refonte | Remplacée par ADR-0005 (proposée) |
+| ADR-0002 | Stratégie de refonte | Superseded by ADR-0005 |
 | ADR-0003 | Matrice de support Windows/MSFS | Accepted |
 | ADR-0004 | Stack cible et politique de versions | Accepted, à réexaminer (`KI-017`) |
-| ADR-0005 | Durcissement au lieu de réécriture | Proposed |
+| ADR-0005 | Durcissement au lieu de réécriture | Accepted |
 
 ## ADR encore à écrire
 
