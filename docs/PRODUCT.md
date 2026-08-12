@@ -1,97 +1,98 @@
-# Vision produit — Thrustline Rebuild
+# Product
 
-Statut : Draft à valider avant la phase 1.
+What this system is, for whom, and what it refuses to be.
 
-## Vision
+Cap: **120 lines**. Read when the open milestone changes what is described here —
+and once, in full, at the first session of anyone new to the repo.
 
-Thrustline transforme les vols MSFS en gestion cohérente d'une compagnie
-aérienne virtuelle : planifier, exploiter, suivre, analyser et développer une
-compagnie sans perdre les données ni pouvoir falsifier facilement son économie.
+**Nothing in this file can be derived from the code.** Every line was asked and
+answered by `PacoRCS`, on 2026-08-12 unless another date is given, or carries the
+ADR in which he answered it earlier.
 
-## Principes produit
+---
 
-- Windows-first et MSFS-first.
-- Fonctionnel même lorsque MSFS est fermé pour la partie gestion.
-- Dégradation claire en cas de panne Supabase, SimBrief, météo ou SimConnect.
-- Aucune perte silencieuse d'un vol ou d'une transaction.
-- Les calculs importants sont explicables à l'utilisateur.
-- Les mises à jour sont signées, récupérables et non destructrices.
-- Vie privée par défaut ; télémétrie facultative et transparente.
+## One sentence
 
-## Utilisateur principal
+Thrustline is a distributable Windows 11 desktop application for managing a
+virtual airline in Microsoft Flight Simulator 2024, for a solo owner-operator.
 
-Un passionné de simulation qui gère sa propre compagnie et effectue lui-même des
-vols dans MSFS.
+## Who uses it
 
-## Modèle produit retenu
+| User | What they are trying to do | What failure costs them |
+| --- | --- | --- |
+| Company owner | run one virtual airline — fleet, schedules, dispatch, finances — and fly its flights in MSFS 2024 | **data and money.** The ledger, fleet and flight history exist only server-side; there is no local copy and no export. A corrupted balance or a lost flight report is unrecoverable for them |
 
-Le MVP est **solo connecté, préparé pour une collaboration ultérieure**,
-conformément à `ADR-0001`.
+The single owner is the only human on a company (ADR-0001). Their failure costs
+data, so **every boundary they touch is `maximum evidence`** in `VALIDATION.md`.
+That is the whole reason the depth column reads the way it does.
 
-- Un utilisateur possède au plus une compagnie.
-- Une compagnie a exactement un propriétaire humain.
-- Le propriétaire est le seul à voir et gérer les vols, finances, flotte et
-  horaires de sa compagnie.
-- Aucun membre, rôle supplémentaire, invitation, partage ou transfert de
-  propriété n'est livré dans le MVP.
-- L'identité de la compagnie reste distincte de celle du propriétaire afin de ne
-  pas bloquer une évolution future.
+## Priorities, in order
 
-La collaboration est probable après le MVP, mais elle nécessitera une nouvelle
-ADR. Ne pas ajouter partiellement du multi-utilisateur.
+1. **Stability and recovery after error** — a simulator session is long and
+   cannot be replayed. A crash that loses a flight in progress costs the user
+   hours they cannot get back, which no later correctness makes up for.
+2. **Security of a distributed, modifiable client** — the app, the sidecar and
+   MSFS all run on the user's machine and can all be edited. Anything the client
+   is trusted with is effectively public.
+3. **Economy and data integrity** — money, ownership and progression are the
+   product. A wrong balance is worse than a missing feature, and unlike a crash
+   it can go unnoticed for weeks.
+4. **MSFS and SimConnect compatibility** — the simulator is a moving target the
+   project does not control; breaking with it makes the product useless even
+   when every test passes.
+5. **Maintainability.**
 
-## Parcours essentiels
+Given two equally correct options, the one serving the higher priority wins,
+even if it costs more. Where an option is more reliable *and* more secure than
+the alternative, take it — that is the owner's standing instruction, and it is
+what settles version and dependency arbitrations.
 
-1. Installer, lancer et créer/se connecter à un compte.
-2. Créer une compagnie sans état partiel.
-3. Acheter ou louer un avion.
-4. Créer un dispatch et préparer le vol avec SimBrief.
-5. Connecter MSFS et suivre les phases du vol.
-6. Reprendre après une déconnexion ou un crash.
-7. Finaliser le vol une seule fois.
-8. Voir les impacts financiers, réputation et maintenance.
-9. Planifier des opérations passives sans incohérence temporelle.
-10. Mettre à jour ou désinstaller sans perdre les données.
+## What it is not
 
-## MVP de la refonte
+Each line prevents a class of feature request and a class of accidental
+architecture.
 
-- Authentification et compagnie.
-- Flotte, maintenance et propriété.
-- Routes, dispatch et SimBrief.
-- SimConnect, phases de vol, ACARS résumé et rapport.
-- Grand livre financier autoritaire.
-- Réputation et progression minimales.
-- Sauvegarde cloud, reprise et diagnostics.
-- Installateur et mises à jour signés.
+- **Not a multi-pilot virtual airline.** No members, roles beyond `owner`,
+  invitations, membership requests, exclusion, suspension, or ownership
+  transfer. No user belongs to more than one company — ADR-0001.
+- **Not a shared or real-time collaborative workspace.** No second human may
+  prepare or fly for a company — ADR-0001.
+- **Not cross-platform.** Windows 11 x64 only: no Windows 10, no ARM64, no
+  Windows Server, no Wine or Proton — ADR-0003.
+- **Not compatible with older or console simulators.** MSFS 2024 only: no MSFS
+  2020, no Xbox, Cloud or PlayStation — SimConnect is not reachable there —
+  ADR-0003.
+- **Not an Electron application.** No embedded Chromium or Node runtime —
+  ADR-0004.
+- **Not a simulator modification.** It never patches MSFS, and never bypasses an
+  ACL, DRM or session boundary — ADR-0003.
 
-## Hors MVP
+## Constraints that are not technical
 
-- Réseau social, marketplace communautaire et mods.
-- Membres de compagnie, rôles collaboratifs, invitations et transfert de
-  propriété.
-- Vols, finances, flotte ou horaires partagés entre plusieurs humains.
-- Application mobile.
-- Tableau de bord web public.
-- Multi-VA complexe.
-- Simulation économique exhaustive.
-- Anti-triche présenté comme inviolable.
+None recorded. Asked 2026-08-12: no regulation, contract, deadline or platform
+policy constrains the work. Revisit before any public distribution — store
+policy and code-signing obligations arrive with it.
 
-## Contraintes de distribution
+## What "working" looks like
 
-- Windows 11 x64 uniquement, version publique encore maintenue par Microsoft.
-- MSFS 2024 stable uniquement ; Microsoft Store/Xbox App et Steam sont deux
-  combinaisons distinctes à prouver avant toute déclaration `Supported`.
-- Windows 10, ARM64, MSFS 2020, Windows Insider et MSFS Beta/Preview sont exclus
-  conformément à `ADR-0003`.
-- Aucun privilège administrateur permanent.
-- Données utilisateur séparées des fichiers d'installation.
-- Politique de confidentialité, support, sécurité et licence avant bêta publique.
+The owner can complete the full path, unattended, without losing state:
+sign in → own one company → acquire and view a fleet → create a dispatch and
+prepare the flight → connect to MSFS and have phases tracked deterministically →
+survive a disconnection or crash mid-flight → get a report and close the flight
+exactly once → see an authoritative ledger entry that matches it.
 
-## Mesures de réussite
+Signals it has stopped working: a flight that cannot be closed, a balance that
+disagrees with its flight history, a session that loses telemetry silently
+rather than reporting the loss, or an update that resets user data.
 
-- Sessions sans crash ≥ objectif défini avant bêta.
-- Zéro double clôture de vol.
-- Zéro variation financière sans écriture de grand livre.
-- Reprise après coupure testée sur chaque parcours essentiel.
-- Temps de démarrage et consommation mémoire budgétés.
-- Mise à jour N-1 → N et rollback validés sur VM propre.
+## Open product questions
+
+A question listed here is a legitimate reason for a unit to sit in `Draft`.
+
+| Question | Blocks | Asked on |
+| --- | --- | --- |
+| Which capabilities are genuinely shipped and merged, and by what evidence? Nothing user-facing is currently proven. | `CURRENT_STATE.md`, every unit that assumes a working baseline | 2026-08-12 |
+| Does the hardening happen in this repository, or in a new one seeded from this codebase? The owner is undecided. | repository strategy, ADR-0005 | 2026-08-12 |
+| Which of the four manifests is the single source of the version number? | the version reset to `0.0.1-alpha` | 2026-08-12 |
+| What is the account-deletion and data-retention policy? No irreversible deletion may be implemented before it exists. | any account-deletion unit | ADR-0001, 2026-07-24 |
+| Which MSFS 2024 channel — Microsoft Store or Steam — gets validated first? Only one machine is available, and a proof on one channel does not carry to the other. | `KI-011`, the SimConnect slice | ADR-0003, 2026-07-26 |

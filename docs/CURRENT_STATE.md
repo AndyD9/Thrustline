@@ -1,213 +1,102 @@
-# État actuel du dépôt
+# Current state
 
-Dernière revue documentaire : 24 juillet 2026 (ticket T0003).
-Statut : baseline locale vérifiée ; validations externes encore requises.
+**The proven present, never the intent.** A capability enters here only once
+merged into the main branch, with the evidence that establishes it. The future
+belongs to the roadmap, defects to `KNOWN_ISSUES.md`.
 
-## Produit
+Cap: **200 lines**, enforced by a check. Update at the close of any unit that
+changes the proven reality. An entry that is no longer true is **replaced**, not
+appended.
 
-La version existante est une alpha active de gestion de compagnie aérienne
-virtuelle. Le routeur et la navigation exposent les parcours suivants :
+---
 
-- authentification et création initiale d'une compagnie ;
-- tableau de bord, compagnie, flotte et marchés d'avions ;
-- routes, dispatch/SimBrief, vols et suivi de vol en direct ;
-- horaires et opérations passives ;
-- équipage, finances, paramètres, EFB et succès.
+## Current milestone: hardening the working application
 
-Le code contient aussi des services de maintenance, expérience passager, ACARS,
-météo, événements de jeu et calculs d'atterrissage. T0001 prouve leur présence
-dans le dépôt, pas leur fonctionnement de bout en bout. Il n'existe pas encore de
-version publique stable.
+The application already does what it is meant to do; the owner's instruction is
+to keep every feature and improve the code underneath it — best practices,
+smaller and more readable files, reliability, security, and dependencies that
+are not years behind. Reached when the code has been hardened boundary by
+boundary without a single user-visible feature being lost. `PacoRCS` decides
+that it is reached.
 
-## Stack active et versions observées
+This replaces the full-rewrite direction of ADR-0002. That reversal needs
+ADR-0005 before any unit relies on it.
 
-Baseline exécutée sous Windows le 24 juillet 2026 :
+## Capabilities shipped in `main`
 
-- Node.js `24.14.1` et npm `11.11.0` ;
-- SDK .NET `10.0.201`, projet bridge ciblant `net8.0` ;
-- `rustc 1.94.1` et `cargo 1.94.1` ;
-- Supabase CLI non installée/non trouvée ;
-- Tauri v2 / Rust, React 18 / TypeScript / Vite / Tailwind ;
-- ASP.NET Core et SimConnect.NET pour le bridge ;
-- REST et SignalR sur loopback entre UI et bridge ;
-- Supabase Auth/PostgreSQL/RLS/Realtime/Edge Functions.
+`<unanswered — asked 2026-08-12>`
 
-Le moteur Node déclaré par `app/package.json` est `>=24.18.0 <25`. La machine de
-baseline est donc en dessous de la version minimale, même si les tests et le
-build frontend réussissent. Les workflows CI utilisent Node `24.18.0`, .NET 8.x
-et Rust stable.
+**Nothing user-facing is currently proven, and that is the honest state, not an
+oversight.** The owner says the application works; the repository cannot yet
+demonstrate it. The only automated coverage is 11 tests across four pure-logic
+files (`boarding`, `geo`, `scheduleGenerator`, `units`) — no UI test, no
+integration test, no bridge test, no RLS test, no end-to-end path.
 
-## Inventaire reproductible
+| Capability | Evidence | Since |
+| --- | --- | --- |
+| Frontend logic suite passes | `cd app; npm test` → 4 files, 11 tests, run 2026-08-12 | 2026-08-12 |
 
-- Lockfiles : `app/package-lock.json` et `app/src-tauri/Cargo.lock`.
-- Scripts npm : `dev`, `build`, `test`, `test:watch`, `test:coverage`, `preview`,
-  `tauri`, `tauri:dev`, `tauri:build`, `sidecar:build`.
-- Scripts dépôt : `scripts/build-sidecar.ps1` et
-  `scripts/security-check.ps1`.
-- Workflows : `.github/workflows/ci.yml` et
-  `.github/workflows/security.yml`.
-- Migrations Supabase append-only constatées : 25.
-- Dépendances directes : 11 npm runtime, 12 npm développement, 2 NuGet,
-  6 Cargo runtime et 1 Cargo build.
-- Variables/configurations relevées par nom seulement :
-  `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SIM_BRIDGE_URL`,
-  `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` et
-  `THRUSTLINE_BRIDGE_TOKEN`.
+Filling this table is the first real question the owner still owes the
+repository. Until then, no unit may assume a working baseline it has not itself
+established.
 
-## Procédure vérifiée depuis un clone propre
+## Units in progress
 
-Installer Windows, Node `24.18.x`, npm, le SDK .NET 8, Rust stable et les
-prérequis Tauri v2, puis exécuter depuis la racine :
+None. POSEIDON was bootstrapped on 2026-08-12; no unit has been opened yet.
 
-```powershell
-Set-Location app
-npm ci
+| Unit | Open milestone | Branch | Blocked by |
+| --- | --- | --- | --- |
+| — | — | — | — |
+
+## Missing for the current milestone
+
+1. **ADR-0005** superseding ADR-0002 — the rewrite decision is reversed but not
+   recorded. Everything below inherits from it.
+2. **The capability inventory** — which features are real, and how each is
+   demonstrated. Without it "keep every feature" has no referent.
+3. **A version reset** to `0.0.1-alpha` across the four manifests, and a
+   decision on which one is the single source.
+4. **A dependency upgrade pass** — 19 direct dependencies are outdated, 8 by a
+   major version.
+5. **A .NET test project**, so `dotnet test` stops exiting `0` on nothing.
+6. **An RLS isolation suite** for owner A / owner B / anonymous.
+7. **python3**, to take the method checks out of agent mode.
+
+## Outside the milestone, tracked elsewhere
+
+Nineteen entries in `docs/KNOWN_ISSUES.md`, including the three contradictions
+between the accepted ADRs and reality (`KI-016`, `KI-017`) and the absent
+release pipeline (`KI-003`). Historical tickets T0001–T0005 and the superseded
+documentation set are in `docs/archive/`; they are context, never law.
+
+## Steering
+
+- **Keep the application, harden the code — `PacoRCS`, 2026-08-12.** No rewrite.
+  Every existing feature is preserved; the work is best practices, smaller
+  files, reliability and security. Reverses ADR-0002; pending ADR-0005.
+- **Reliability and security win arbitrations — `PacoRCS`, 2026-08-12.** Where
+  one option is more reliable and more secure, take it, including for runtime
+  and dependency versions.
+- **Semver from `0.0.1-alpha` — `PacoRCS`, 2026-08-12.** The four manifests
+  currently read `0.2.0` independently; the single source is undecided.
+- **POSEIDON adopted, prior docs archived — `PacoRCS`, 2026-08-12.** The four
+  ADRs stay live in `docs/decisions/`; tickets, roadmap and the superseded
+  document set moved to `docs/archive/` with history preserved.
+- **`checks: agent mode` — bootstrap, 2026-08-12.** `python3` is absent, so
+  `poseidon/checks/check.py` runs nowhere, including CI. Method-document caps,
+  boundary-to-section correspondence and placeholder detection are unverified.
+  Every report must say so.
+- **A new repository is under consideration — `PacoRCS`, 2026-08-12.** Possibly
+  a fresh start seeded from this codebase. Undecided; `docs/`, `AGENTS.md` and
+  `poseidon/` travel intact if it happens.
+
+## Reproduce and verify
+
+```
+cd app
 npm test
-npm run build
-
-Set-Location ..\sim-bridge
-dotnet restore
-dotnet build --configuration Release
-dotnet test --configuration Release
-
-Set-Location ..\app\src-tauri
-cargo check --locked
-
-Set-Location ..\..
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\security-check.ps1
 ```
 
-Configurer uniquement après restauration les variables nécessaires dans un
-fichier local non versionné. L'exécution de l'application et les validations
-cloud nécessitent une instance Supabase configurée. Le suivi réel nécessite
-MSFS/SimConnect. Le packaging signé nécessite un certificat approprié.
-
-## Validation exécutée le 24 juillet 2026
-
-- `npm ci` : réussi depuis le lockfile ; avertissement `EBADENGINE` à cause de
-  Node `24.14.1` ; audit npm signalant 2 vulnérabilités modérées.
-- `npm test` : 4 fichiers, 11 tests réussis.
-- `npm run build` : TypeScript/Vite réussi.
-- `dotnet restore` : réussi.
-- `dotnet build --configuration Release` : réussi, 0 avertissement, 0 erreur.
-- `dotnet test --configuration Release` : code 0, mais aucun projet de tests ni
-  test exécuté.
-- `cargo check --locked` : réussi ; avertissement d'environnement sur la
-  canonicalisation de `C:\Users\andyd`.
-- `scripts/security-check.ps1` : invariants réussis lorsque PowerShell est lancé
-  avec `-ExecutionPolicy Bypass`.
-
-Les premiers essais de `npm ci`, `dotnet restore` et `dotnet test` ont échoué
-par refus d'accès du bac à sable aux caches/configurations utilisateur, puis ont
-réussi avec cet accès autorisé. Le premier lancement direct du script de sécurité
-a été bloqué par la politique PowerShell locale, puis a réussi avec le bypass
-explicite. Ces échecs sont classés comme environnement, pas comme défauts du code.
-
-## Contrôles non exécutables dans cette baseline
-
-- Connexion réelle à MSFS/SimConnect, replay de trace et parcours de vol : MSFS
-  absent et aucun replay automatisé fourni.
-- Démarrage/reset Supabase local, application des migrations et tests RLS entre
-  deux utilisateurs : Supabase CLI absente et aucun environnement de test fourni.
-- Déploiement de l'Edge Function et validation cloud : projet/identifiants
-  Supabase absents.
-- Build installable signé, installation, mise à jour et rollback : aucun
-  certificat de signature ni pipeline de release complet fourni.
-- Validation manuelle complète de l'interface : services externes requis absents.
-
-## Sécurité déjà présente
-
-- Bridge lié à localhost.
-- Jeton aléatoire d'instance entre Tauri et bridge.
-- CSP Tauri et capacités limitées.
-- Clôture de vol privilégiée déplacée vers une Edge Function/RPC.
-- Migrations de durcissement RLS/grants.
-- CI avec audits de dépendances, scan de secrets et invariants.
-
-## Dette et risques structurants
-
-- Aucun projet de tests .NET dédié constaté.
-- Aucun test RLS automatisé livré constaté.
-- Le build Tauri complet dépend du sidecar généré dans `externalBin`.
-- L'environnement local Node ne satisfait pas le moteur déclaré.
-- Les README divergent (`Node 24.18 LTS` contre `Node 20+`) et utilisent
-  `npm install` au lieu de la restauration déterministe `npm ci`.
-- Deux vulnérabilités npm modérées sont signalées ; aucune mise à jour n'a été
-  faite dans T0001.
-- Pages React volumineuses et mélange UI/orchestration/données.
-- Mutations métier directes depuis le client et séquences multi-écritures non
-  atomiques.
-- Pas de pipeline complet de release signée/updater.
-- Versions répétées dans plusieurs manifestes.
-- Politique de suppression/récupération du propriétaire et durée de rétention à
-  définir avant toute suppression irréversible.
-
-## Travail local à préserver
-
-La modification utilisateur de `app/src-tauri/Cargo.toml` est restée intacte
-pendant T0001. Son empreinte SHA-256 avant et après validation est
-`94BF4E46145BC363B70BD3EEE5BBA578EF198718EBDADB7264C260FEAFAE2AFE`.
-Les autres modifications utilisateur préexistantes n'ont pas été intégrées au
-ticket.
-
-## Décision produit
-
-`ADR-0001` retient un MVP solo connecté préparé pour une collaboration
-ultérieure : au plus une compagnie par utilisateur, un propriétaire humain
-unique, aucun membre ni rôle collaboratif dans le MVP. La collaboration probable
-après le MVP exigera une nouvelle ADR.
-
-## Décision de refonte
-
-`ADR-0002` retient une réécriture totale isolée dans un nouveau dépôt avec un
-historique Git neuf. Le dépôt actuel devient une référence en lecture seule pour
-l'UX, les comportements et la documentation jusqu'à parité du golden path, puis
-il sera archivé. Le nouveau produit utilise un schéma Supabase neuf : les données
-actuelles sont uniquement des données de développement et ne seront pas migrées.
-Il n'y aura ni coexistence en production, ni double écriture, ni ancien client
-connecté au nouveau backend. Une seule bascule publique est prévue après les
-gates de caractérisation, SimConnect, parité, restauration et distribution.
-
-## Décision de support
-
-`ADR-0003` retient Windows 11 x64, sur une version publique encore maintenue par
-Microsoft, et MSFS 2024 stable uniquement. Microsoft Store/Xbox App et Steam sont
-deux combinaisons distinctes qui restent `Unsupported — validation requise`
-jusqu'à une fiche de test réelle par canal. Windows 10, ARM64, MSFS 2020,
-Windows Insider et les builds MSFS Beta/Preview sont `Unsupported`.
-
-Une machine Ryzen 7 5800X, 32 Go et RX 6070 XT est disponible comme profil
-recommandé de validation. Elle ne prouve pas le minimum matériel. Aucun test
-MSFS réel n'a été exécuté dans T0004.
-
-## Décision de stack cible
-
-`ADR-0004` retient Node 24 LTS avec pnpm 11, React 19/Vite 8, Tauri 2.11 sur
-WebView2 Evergreen, Rust stable épinglé, un bridge .NET 10 LTS self-contained
-`win-x64`, le SDK SimConnect officiel derrière une abstraction interne, et
-Supabase/PostgreSQL 17. Firebase, Electron et le wrapper `SimConnect.NET` ne sont
-pas les fondations de la refonte.
-
-Cette décision est documentaire : aucune version n'a été installée et aucun
-manifest, lockfile, workflow ou code applicatif n'a été modifié. Les performances
-et la compatibilité self-contained SimConnect restent à prouver par les tickets
-d'adoption.
-
-## Prochain ticket recommandé
-
-`T0006 — Épingler les runtimes et créer la source de versions`. Il doit créer
-dans le nouveau dépôt les pins Node/pnpm/Rust/.NET/PowerShell, le bootstrap et
-les contrôles de dérive, sans introduire encore le shell ou le frontend. Les
-budgets du profil minimum/recommandé sont renumérotés `T0015`.
-
-## Mise à jour de ce fichier
-
-Après chaque ticket terminé, modifier uniquement :
-
-- capacités réellement disponibles ;
-- structure ou dépendances actives ;
-- validation réellement exécutée ;
-- dette ajoutée/résolue ;
-- prochain ticket recommandé.
-
-Ne pas y copier l'historique Git ni les projets futurs.
+Expect `4 passed (4)` files and `11 passed (11)` tests. That is the only claim
+on this page that has been executed. Everything else in `docs/VALIDATION.md` is
+`not run` or `blocked by environment` as of 2026-08-12.

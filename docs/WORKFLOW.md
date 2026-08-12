@@ -1,121 +1,115 @@
-# Workflow de refonte
+# Workflow
 
-## Rôles
+The **procedure** for each phase lives in the slash commands. This file defines
+what the phases operate on: roles, states, the unit, and the size limits. Read
+the section the router names, not the file.
 
-- **Andy — Product Owner** : tranche la vision, le périmètre et les compromis.
-- **Agent planificateur** : analyse le dépôt, propose ADR, roadmap et tickets.
-- **Codex implémenteur** : exécute un ticket borné et fournit les preuves.
-- **Reviewer** : cherche régressions, failles, dérive architecturale et tests
-  manquants avant validation.
+Cap: **165 lines**.
 
-Un même outil peut tenir plusieurs rôles, mais pas dans la même étape sans
-effectuer une revue adversariale explicite.
+## Roles
 
-## États d'un ticket
+- **`<Owner>`** — settles vision, scope, trade-offs, and merges. The only role
+  never held by an agent.
+- **Coordinator** — carries one unit end to end: plan, code, evidence.
+- **Reviewer** — hunts regressions, flaws, drift, and missing tests.
 
-`Draft → Ready → In progress → Review → Verify → Done`
+One agent may hold the last two roles, never on the same milestone.
 
-États alternatifs : `Blocked`, `Rejected`, `Superseded`.
+## States
 
-## 1. Préparer la phase
+Two independent fields, two closed lists. A check enforces both.
 
-1. Définir le résultat utilisateur.
-2. Écrire/valider les ADR structurantes.
-3. Identifier dépendances et risques.
-4. Découper en vertical slices.
-5. Créer seulement les 3–8 prochains tickets détaillés ; garder le reste au
-   niveau roadmap pour éviter un plan périmé de 50 tickets.
+- **Unit** `Status:` — `Draft` → `Ready` → `In progress` → `Done`.
+  Alternates: `Blocked`, `Rejected`, `Superseded`. (`Review` and `Verify` are
+  legal but describe a whole unit awaiting `<Owner>`, not a milestone.)
+- **Milestone** `Status:` — `Draft` → `In progress` → `Review` → `Verify` →
+  `Verified` → `Done`. Alternate: `Blocked`.
 
-## 2. Rendre un ticket Ready
+`Verified` and `Done` are distinct on purpose: `/verify` writes the first,
+`/close` writes the second, and the gap is what makes a close survive a session
+ending between them.
 
-Un ticket Ready contient :
+Which command a given pair routes to is defined **only** in POSEIDON's router
+table, `poseidon/POSEIDON.md`. It is not repeated here.
 
-- objectif unique ;
-- dépendances satisfaites ;
-- zones autorisées et interdites ;
-- exigences et non-objectifs ;
-- critères d'acceptation observables ;
-- tests attendus ;
-- vérification manuelle de 5–10 minutes ;
-- revue sécurité si nécessaire.
+## The unit of work
 
-Le reviewer challenge le ticket avant tout code : trop large, ambigu, mauvaise
-frontière ou absence de preuve = retour en Draft.
+The unit of tracking, of branching, and of integration is the **user
+capability**: one file in `docs/features/`, one branch, one Pull Request.
 
-## 3. Implémenter
+A capability is a complete vertical slice. Data schema, authoritative service,
+authenticated boundary, validation on a real runtime, and client composition
+live together in it, split into ordered **milestones**: one commit per milestone,
+one review per milestone, one manual verification per milestone.
 
-1. Créer une branche `type/TXXXX-slug`.
-2. Lire `AGENTS.md`, `CURRENT_STATE.md`, le ticket et les docs liées.
-3. Vérifier l'état Git et préserver les changements existants.
-4. Inspecter le code réel.
-5. Implémenter seulement le ticket.
-6. Exécuter d'abord les tests ciblés, puis les gates applicables.
-7. Ne pas corriger les découvertes hors scope ; les consigner.
+Work that is not a user capability — governance, a fix, tooling, a check — uses
+**the same file with a single milestone**. There is no second format to maintain.
 
-Types de branche : `foundation`, `feature`, `fix`, `security`, `refactor`, `docs`.
+Why the vertical slice: splitting a capability into four to six technical units
+produces as many branches, bases, and index lines to keep consistent — for user
+value that only exists at the last one. The cost is paid in reconciliation units
+that ship nothing.
 
-## 4. Revoir
+## 1. Prepare
 
-La revue vérifie dans cet ordre :
+1. Define the user outcome.
+2. Write or confirm the structuring decisions.
+3. Identify dependencies and risks.
+4. Split into capabilities, each a complete vertical slice.
+5. Order milestones from most-constraining to most-dependent: data and authority
+   before boundary, boundary before client composition.
+6. Detail only the **next one to three** capabilities; keep the rest at roadmap
+   level, so the plan does not go stale.
 
-1. sécurité et perte de données ;
-2. conformité aux critères ;
-3. régressions et compatibilité ;
-4. architecture et dette créée ;
-5. tests et observabilité ;
-6. lisibilité et performance.
+Before launching a wave: map the shared paths, ask for every `<Owner>` decision
+in **one batch**, assign disjoint paths and the integration order, reserve the
+verification environments, and confirm no approved Pull Request is waiting only
+on propagation.
 
-Une revue ne doit pas demander une réécriture esthétique sans bénéfice mesurable.
+Daily priority order: a Pull Request ready to integrate, a blocking CI, a
+critical-path dependency, then a new unit. Code volume does not measure progress;
+only a proven capability present on the main branch reduces what is left.
 
-## 5. Vérifier
+## 2. Ready
 
-Effectuer la checklist manuelle du ticket. Si elle échoue, le ticket revient en
-`In progress`. Si elle est impossible localement, indiquer précisément qui doit
-la faire et sur quel environnement ; le ticket reste `Verify`.
+A `Ready` capability has: one user goal; dependencies genuinely satisfied; the
+union of `Allowed areas` and `Do not touch`; ordered milestones, each with its
+observable result, primary boundary, and validations; acceptance criteria
+observable over the whole capability; and one 5–10 minute manual verification per
+milestone.
 
-## 6. Clore
+The reviewer challenges the unit **before any code**. Double goal, unobservable
+milestone, wrong boundary, or missing evidence sends it back to `Draft`. A
+milestone that cannot be committed alone is not a milestone: it belongs to the
+previous one.
 
-1. Remplir le Completion Report dans le ticket.
-2. Actualiser `CURRENT_STATE.md` si l'état réel a changé.
-3. Ajouter les problèmes différés dans `KNOWN_ISSUES.md`.
-4. Mettre à jour une ADR seulement par une nouvelle ADR qui la remplace.
-5. Fusionner après checks et revue.
-6. Choisir le prochain ticket Ready.
+## 3 to 6. Implement, review, verify, close
 
-## Limites de taille
+Procedure in `/milestone`, `/review`, `/verify`, `/close`. Not restated here.
 
-Un bon ticket :
+One principle governs all four and is stated only here: **a capability is
+reviewed milestone by milestone, on the pushed diff, by an agent that did not
+write it, before the next milestone opens.** This is the counterpart of the
+vertical slice. Without it a sensitive-data change and a read-only panel go
+through the same review, and the first loses the attention it deserves. A single
+review at the end of a capability is non-conforming.
 
-- vise un résultat ;
-- modifie idéalement une frontière principale ;
-- produit un diff révisable ;
-- se vérifie manuellement en 5–10 minutes ;
-- peut être abandonné sans invalider plusieurs jours de travail.
+## Size limits
 
-Si le ticket combine migration, nouveau protocole, gros écran et pipeline release,
-le diviser.
+A good capability targets a single outcome, statable without an "and", carries
+two to five milestones, and can be abandoned without invalidating more than a few
+days of work.
 
-## Commande de démarrage recommandée
+A good milestone targets an observable result, changes **one** primary boundary
+and not three, produces a diff reviewable in one pass, is manually verifiable in
+5–10 minutes, and **is committable alone** even if the capability is incomplete.
 
-```text
-Implémente uniquement le ticket TXXXX.
+The milestone carries the size limit, not the capability. A milestone combining a
+data change, a new protocol, and a large screen must be split. A capability
+needing more than five milestones, or two goals, must be split.
 
-Lis AGENTS.md, docs/CURRENT_STATE.md et le ticket complet.
-Respecte Allowed areas et Do not touch.
-Avant de coder, signale toute contradiction bloquante.
-Après le changement, exécute les validations du ticket et remplis son
-Completion Report avec preuves, risques et follow-ups.
-```
+## Side loops
 
-## Rétrospective
-
-À la fin de chaque phase :
-
-- quelles règles ont évité une erreur ?
-- quels tickets étaient trop grands ou ambigus ?
-- quels contrôles manquaient ?
-- quels documents ont dérivé ?
-- quelle automatisation répétée mérite un script ou une skill ?
-
-Modifier le workflow uniquement sur la base d'un problème répété.
-
+Learning: `docs/LEARNINGS.md`. Debt and out-of-scope discoveries:
+`docs/KNOWN_ISSUES.md`. Accepted invariants: `docs/RULES.md`. None of these is
+restated here — that is the single-source rule.
