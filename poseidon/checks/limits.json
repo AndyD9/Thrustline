@@ -1,0 +1,144 @@
+{
+  "line_caps": {
+    "AGENTS.md": 115,
+    "docs/CURRENT_STATE.md": 200,
+    "docs/WORKFLOW.md": 165,
+    "docs/RULES.md": 300,
+    "docs/VALIDATION.md": 130,
+    "poseidon/templates/FEATURE.md": 105,
+    "poseidon/templates/ADR.md": 45,
+    "docs/PRODUCT.md": 120,
+    "docs/ARCHITECTURE.md": 150,
+    "docs/SETUP.md": 100
+  },
+  "zone_agents_cap": 50,
+  "unit_states": [
+    "Draft",
+    "Ready",
+    "In progress",
+    "Review",
+    "Verify",
+    "Done",
+    "Blocked",
+    "Rejected",
+    "Superseded"
+  ],
+  "unit_states_active": [
+    "In progress",
+    "Review",
+    "Verify"
+  ],
+  "unit_states_closed": [
+    "Done",
+    "Rejected",
+    "Superseded"
+  ],
+  "milestone_states": [
+    "Draft",
+    "In progress",
+    "Review",
+    "Verify",
+    "Verified",
+    "Done",
+    "Blocked"
+  ],
+  "max_units_in_progress": 2,
+  "issue_severities": [
+    "Critical",
+    "High",
+    "Medium",
+    "Low"
+  ],
+  "issue_statuses": [
+    "Open",
+    "Accepted",
+    "Scheduled",
+    "Resolved",
+    "Invalid"
+  ],
+  "learning_states": [
+    "Observed",
+    "Reproduced",
+    "Codified",
+    "Enforced",
+    "Stale"
+  ],
+  "learning_states_needing_revalidation": [
+    "Codified",
+    "Enforced"
+  ],
+  "no_unit_id_in_headings": [
+    "AGENTS.md",
+    "docs/RULES.md",
+    "docs/VALIDATION.md",
+    "docs/CURRENT_STATE.md",
+    "docs/WORKFLOW.md",
+    "docs/ARCHITECTURE.md",
+    "docs/PRODUCT.md",
+    "docs/SETUP.md"
+  ],
+  "baselines_file": "docs/validation-baselines.json",
+  "code_extensions": [
+    ".py",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".kt",
+    ".rb",
+    ".php",
+    ".c",
+    ".h",
+    ".cc",
+    ".cpp",
+    ".hpp",
+    ".cs",
+    ".swift",
+    ".sh",
+    ".sql",
+    ".yml",
+    ".yaml",
+    ".toml"
+  ],
+  "marker_words": [
+    "TODO",
+    "FIXME",
+    "HACK",
+    "XXX"
+  ],
+  "ignored_dirs": [
+    ".git",
+    "node_modules",
+    "vendor",
+    "dist",
+    "build",
+    "target",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".next",
+    ".cache",
+    "docs/archive",
+    "poseidon",
+    ".claude"
+  ],
+  "placeholder_targets": [
+    "AGENTS.md",
+    "docs/CURRENT_STATE.md",
+    "docs/WORKFLOW.md",
+    "docs/RULES.md",
+    "docs/VALIDATION.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/LEARNINGS.md",
+    "docs/PRODUCT.md",
+    "docs/ARCHITECTURE.md",
+    "docs/SETUP.md"
+  ],
+  "placeholder_exempt": [
+    "poseidon/"
+  ],
+  "adoption_file": "docs/adoption.json"
+}

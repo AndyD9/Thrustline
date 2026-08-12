@@ -1,177 +1,106 @@
-# Architecture cible
+# Architecture
 
-Statut : cible de refonte ; toute divergence durable nécessite un ADR.
+The shape of the system, and **where trust changes**.
 
-## Architecture logique
+Cap: **150 lines**. Read the `Boundaries` table when opening a unit; read the
+rest only when the open milestone changes what it describes.
 
-```text
-MSFS
-  │ SimConnect (données non fiables)
-  ▼
-Bridge .NET 10 LTS
-  │ événements de vol versionnés
-  │ canal local authentifié
-  ▼
-Tauri 2.11 / Rust stable épinglé
-  │ capacités natives minimales
-  ▼
-React 19 / TypeScript 6
-  │ lectures RLS + commandes HTTPS
-  ▼
-Supabase / PostgreSQL 17
-  ├─ Auth
-  ├─ PostgreSQL + RLS
-  ├─ RPC/Edge Functions transactionnelles
-  ├─ Realtime
-  └─ jobs serveur contrôlés
-```
+Every row carries the file it was read from. A row with no evidence is a belief.
 
-## Frontières de confiance
+---
 
-- Le frontend, Tauri, le bridge, MSFS et tous les fichiers importés sont publics
-  et modifiables par l'utilisateur.
-- Supabase valide identité, appartenance, permissions et transitions.
-- Le serveur recalcule argent, prix, récompenses, usure et progression.
-- La télémétrie est un signal borné et analysé, pas une preuve absolue.
+## Boundaries
 
-## Responsabilités
+**This table is the spine of the repository.** Each row here is a section of
+`docs/RULES.md` and a row of `docs/VALIDATION.md`.
 
-### React
+| Boundary | Trust changes how | Enforced in | Read from |
+| --- | --- | --- | --- |
+| Data and persistence | an authenticated identity becomes durable rows filtered by RLS | `supabase/migrations/` | `20260721190000_security_hardening.sql` |
+| Authoritative service | a client-reported flight becomes an irreversible ledger write | `supabase/functions/`, SQL RPCs | `supabase/functions/complete-flight/index.ts` |
+| Bridge local API | a loopback HTTP caller becomes the holder of a live user JWT | `sim-bridge/Program.cs` | `sim-bridge/Program.cs:116` |
+| SimConnect and MSFS | simulator telemetry becomes domain flight events | `sim-bridge/SimConnect/` | `sim-bridge/SimConnect/ISimClient.cs` |
+| Third-party egress | an outside response becomes a domain object | `app/src/lib/simbrief.ts`, `sim-bridge/Program.cs` | `app/src/lib/simbrief.ts:3`, `sim-bridge/Program.cs:188` |
+| Desktop shell | web content becomes operating-system reach | `app/src-tauri/` | `app/src-tauri/capabilities/default.json` |
+| Distribution | source becomes a signed artifact on a user machine | `scripts/build-sidecar.ps1` | `.github/workflows/ci.yml:66` |
 
-- Présentation, formulaires, cache de vues et états UX.
-- Aucun calcul client utilisé comme autorité économique.
-- Pages minces ; logique dans modules de fonctionnalité testables.
-- Une couche `queries` pour les lectures et `commands` pour les mutations.
+The React client is not a boundary. It is the untrusted side of four of them.
 
-### Tauri/Rust
+## Components
 
-- Cycle de vie de l'application et du bridge.
-- Capacités natives en allowlist.
-- Validation native des URL externes.
-- Update signée, diagnostics et stockage local approprié.
+| Component | Responsibility | Depends on | Read from |
+| --- | --- | --- | --- |
+| `app/` | UI, client orchestration, session handling | Supabase, bridge, SimBrief | `app/package.json` |
+| `app/src-tauri/` | desktop shell, WebView2 host, sidecar launch | `app/`, sidecar | `app/src-tauri/Cargo.toml` |
+| `sim-bridge/` | SimConnect telemetry, flight detection, local REST/SignalR | MSFS, Supabase | `sim-bridge/Thrustline.Bridge.csproj` |
+| `supabase/` | schema, RLS, RPCs, edge function | — | `supabase/config.toml` |
+| `legacy/` | read-only Electron + WPF reference | — | `legacy/package.json` |
 
-### Bridge .NET
+## What is authoritative over what
 
-- Connexion/reconnexion SimConnect.
-- Client hors processus self-contained Windows x64, limité à la session locale.
-- SDK/API SimConnect officiel MSFS 2024 isolé derrière `ISimConnectAdapter` ;
-  aucun type SDK dans le domaine et aucune dépendance du domaine au wrapper.
-- Normalisation, validation et agrégation de la télémétrie.
-- Machine à états de vol déterministe et rejouable.
-- Rapport de vol versionné.
-- Aucun secret privilégié ni écriture économique directe.
+**The server is authoritative for money, ownership, reputation, progression and
+every sensitive transition.** The desktop app, the sidecar and MSFS are all
+untrusted clients — a modifiable client on a user's machine can send anything.
 
-### Supabase
+Never trusted from a client: money amounts, ownership claims, role claims, the
+current time, flight outcomes, or any identity supplied in a request body.
+Caller identity is derived from the JWT alone. `scripts/security-check.ps1`
+enforces two consequences of this mechanically: no `p_now` in `app/src` (a
+client-controlled server clock) and no service-role credential in the sidecar.
 
-- Identité et autorisation.
-- Ownership MVP limité côté serveur à un propriétaire par compagnie et au plus
-  une compagnie par utilisateur.
-- Identité de compagnie distincte de l'identité utilisateur, sans droit
-  collaboratif implicite.
-- Commandes sensibles transactionnelles et idempotentes.
-- Grand livre immuable et projections.
-- RLS défensive sur chaque table exposée.
-- Audit des changements sensibles.
-- Traitements passifs côté serveur, indépendants d'un client ouvert.
-- PostgreSQL 17 fourni par la plateforme ; migrations et types générés depuis
-  le schéma neuf.
-- RPC SQL préférée pour les commandes purement transactionnelles ; Edge
-  Functions réservées à l'orchestration réseau ou aux secrets serveur.
+The sidecar is trusted with *less* than the app: it holds a user access token in
+memory (`sim-bridge/Session/SessionStore.cs`) but is never given a privileged
+key.
 
-## Stratégie de construction
+## Data flow of the main path
 
-Conformément à `ADR-0002`, l'architecture cible sera construite par réécriture
-totale dans un nouveau dépôt et un historique Git neuf. Le dépôt actuel reste une
-référence en lecture seule pour les comportements, l'UX et la documentation
-jusqu'à validation de la parité du golden path, puis il est archivé.
+1. User authenticates against Supabase Auth — crosses **Data and persistence**.
+2. App posts `accessToken` + `supabaseUrl` + `anonKey` to `POST /session` on
+   `127.0.0.1:5055`; the bridge verifies the token against `/auth/v1/user`
+   before storing a session — crosses **Bridge local API**.
+3. Bridge subscribes to MSFS via `NativeSimConnectClient` and detects phases —
+   crosses **SimConnect and MSFS**.
+4. Telemetry is pushed to the app over SignalR `/hubs/sim` — crosses
+   **Bridge local API**.
+5. Flight completion is submitted to the `complete-flight` edge function, which
+   computes and writes the ledger — crosses **Authoritative service**.
+6. Rows are read back under RLS — crosses **Data and persistence**.
 
-Il n'existe aucune coexistence en production, aucune double lecture/écriture et
-aucune compatibilité avec l'ancien schéma. Le nouveau dépôt utilise des branches
-courtes, une intégration fréquente et une CI obligatoire. Le premier vertical
-slice critique est le moteur de vol SimConnect rejouable jusqu'au rapport
-versionné.
+## State that outlives a request
 
-## Organisation cible
+| Store | Written by | Read by | If lost |
+| --- | --- | --- | --- |
+| Supabase PostgreSQL | edge function, RPCs | app under RLS | company, fleet, finances and history are gone; no local copy exists |
+| Bridge session (in memory) | `POST /session` | bridge services | user re-authenticates; no data loss |
+| WebView2 local storage | `@supabase/supabase-js` (`persistSession: true`) | app | user signs in again |
+| Build artifacts | `scripts/build-sidecar.ps1` | installer | rebuild from source |
 
-```text
-app/src/
-  app/                 # composition, routes, providers
-  features/
-    dispatch/
-      api/
-      components/
-      hooks/
-      model/
-      tests/
-  shared/              # UI, contrats, utilitaires sans métier
+## Deliberate architectural constraints
 
-sim-bridge/
-  Api/
-  Application/
-  Domain/
-  Infrastructure/
-    SimConnect/
-  Contracts/
+A unit may not quietly undo these. Changing one requires a superseding ADR.
 
-supabase/
-  functions/
-  migrations/
-  tests/
+- Harden in place, never rewrite: every existing feature is preserved, and
+  improvement happens boundary by boundary as bounded units — ADR-0005,
+  superseding ADR-0002.
+- Solo ownership: one account owns at most one company and is its only human;
+  `owner` is the only role — ADR-0001.
+- Windows 11 x64 + MSFS 2024 only; no Windows 10, ARM64, MSFS 2020, or
+  Xbox/Cloud — ADR-0003.
+- Tauri + WebView2, not Electron; Supabase/PostgreSQL, not Firestore;
+  SimConnect behind an internal replayable abstraction — ADR-0004.
+- `legacy/` is read-only until explicitly archived — `AGENTS.md`.
 
-docs/
-  decisions/
-  tickets/
-  templates/
-```
+## Known structural debt
 
-Cette organisation appartient au nouveau dépôt. Aucun code n'y est déplacé
-depuis le dépôt actuel sans ticket de caractérisation et preuve de qualité,
-sécurité, provenance et licence. La réécriture reste pilotée par gates et tests
-de caractérisation malgré l'absence de migration de code.
+Where the real structure disagrees with the documents above.
 
-## Données
-
-- UUID pour les identités distribuées.
-- Horodatages UTC ; temps simulé explicitement distinct du temps réel.
-- Grand livre financier append-only.
-- Version ou jeton de concurrence sur ressources sensibles.
-- `operation_id` unique pour chaque commande rejouable.
-- Suppression logique pour données auditables ; rétention documentée.
-- Types Supabase générés et dérive détectée en CI.
-
-## Contrats
-
-- Payloads REST, SignalR et RPC versionnés.
-- Validation aux deux extrémités.
-- Changements compatibles ou migration coordonnée.
-- Événements de domaine sans types SimConnect natifs.
-
-## Résilience
-
-- Timeout et annulation sur toute I/O.
-- Retry uniquement pour opérations idempotentes, avec backoff et jitter.
-- File locale/outbox pour les commandes critiques interrompues.
-- États visibles : local, pending, synchronized, rejected.
-- Aucun `last write wins` pour argent, propriété ou affectations.
-
-## Décisions encore ouvertes
-
-- HTTP localhost renforcé ou named pipe Windows pour le bridge.
-- Cache SQLite local et données autorisées hors ligne.
-- Stratégie d'anti-triche proportionnée.
-- Fournisseur de crash reporting et consentement.
-
-## Décisions acceptées
-
-- `ADR-0001` : MVP solo connecté, un propriétaire unique et au plus une
-  compagnie par utilisateur ; modèle préparé pour une collaboration ultérieure,
-  sans membre ni rôle collaboratif dans le MVP.
-- `ADR-0002` : réécriture totale isolée dans un nouveau dépôt ; ancien dépôt
-  conservé comme référence en lecture seule, nouveau schéma sans migration des
-  données de développement et une seule bascule publique après parité.
-- `ADR-0003` : Windows 11 x64 maintenu et MSFS 2024 stable uniquement ; Store et
-  Steam sont validés séparément, sans support Windows 10, ARM64, MSFS 2020,
-  Insider ou Preview. WebView2 Evergreen et bridge .NET self-contained.
-- `ADR-0004` : Node 24/pnpm 11/React 19/Tauri 2.11, bridge .NET 10 LTS avec SDK
-  SimConnect officiel abstrait et backend Supabase/PostgreSQL 17. Les versions
-  exactes et la politique mensuelle sont dans `docs/STACK.md`.
+- **ADR-0004 pins a stack the repository does not have**: .NET 10, pnpm 11,
+  TypeScript 6, React 19, Tauri 2.11, `rust-toolchain.toml`. Actual: `net8.0`,
+  npm, TypeScript 5.9, React 18.3, no `rust-toolchain.toml` — `KI-017`.
+- **No .NET test project exists**, so `dotnet test` discovers nothing and exits
+  `0` — `KI-004`.
+- **No automated RLS isolation suite** covering owner A / owner B / anonymous —
+  `KI-002`.
+- The bridge weather routes use a static `new HttpClient()`
+  (`sim-bridge/Program.cs:178`) while `IHttpClientFactory` is registered at
+  line 57 and used correctly at line 119 — `KI-018`.
